@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"io"
-	"math/rand"
 	"os"
 	"strconv"
 	"strings"
@@ -1449,57 +1448,6 @@ func (t *Tracee) initBPF() error {
 	return errfmt.WrapError(err)
 }
 
-func (t *Tracee) lkmSeekerRoutine(ctx gocontext.Context) {
-	logger.Debugw("Starting lkmSeekerRoutine goroutine")
-	defer logger.Debugw("Stopped lkmSeekerRoutine goroutine")
-
-	if t.events[events.HiddenKernelModule].emit == 0 {
-		return
-	}
-
-	err := derive.InitFoundHiddenModulesCache()
-	if err != nil {
-		logger.Errorw("err occurred initializing kernel hidden modules cache: " + err.Error())
-		return
-	}
-
-	modsMap, err := t.bpfModule.GetMap("modules_map")
-	if err != nil {
-		logger.Errorw("err occurred GetMap: " + err.Error())
-		return
-	}
-
-	// randomDuration returns a random duration between min and max, inclusive
-	randomDuration := func(min, max int) time.Duration {
-		randDuration := time.Duration(rand.Intn(max-min+1)+min) * time.Second
-		return randDuration
-	}
-
-	// get a random duration between 10 and 310 seconds
-	waitDuration := randomDuration(10, 310)
-
-	for {
-		derive.ClearModulesState(modsMap)
-		err = derive.FillModulesFromProcFs(t.kernelSymbols, modsMap)
-		if err != nil {
-			logger.Errorw("hidden kernel module seeker stopped!: " + err.Error())
-			return
-		}
-
-		t.triggerKernelModuleSeeker()
-
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(waitDuration):
-			// continue
-		}
-
-		// renew wait duration
-		waitDuration = randomDuration(10, 310)
-	}
-}
-
 const pollTimeout int = 300
 
 // Run starts the trace. it will run until ctx is cancelled
@@ -1697,10 +1645,6 @@ func (t *Tracee) triggerSyscallsIntegrityCheck(event trace.Event) {
 func (t *Tracee) triggerSyscallsIntegrityCheckCall(
 	magicNumber uint64, // 1st arg: allow handler to detect calling convention
 	eventHandle uint64) {
-}
-
-//go:noinline
-func (t *Tracee) triggerKernelModuleSeeker() {
 }
 
 // triggerSeqOpsIntegrityCheck is used by a Uprobe to trigger an eBPF program
