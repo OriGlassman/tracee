@@ -595,20 +595,21 @@ enum
     HIDDEN_MODULE = 1 << 31,
 };
 
-// This map is only used from kernels 5.2 and above.
-// If we won't create the map, the userspace will receive an error when interacting with it,
-// and since the userspace is not kernel version aware, it won't know whether it's because
-// the map simply wasn't created due to kernel version, or something unexpected failed.
+// Forcibly create the map in all kernels, even when not needed, due to lack of
+// support for kernel version awareness about map loading errors.
+
 BPF_HASH(modules_map, u64, kernel_module_t, MAX_NUM_MODULES);
 BPF_HASH(new_module_map, u64, kernel_new_mod_t, MAX_NUM_MODULES);
 
-// We only care for modules that got deleted or inserted between our scan and if we detected
-// something suspicious. Since it's a very small time frame, it's not likely that a large amount of
-// modules will be deleted. Instead of saving a map of deleted modules, we could have saved the last
-// deleted module timestamp and if we detected something suspicious, verify that no modules got
-// deleted between our check. This is preferable space-wise (u64 instead of a map), but an attacker
-// might start unloading modules in the background and race with the check in order to abort
-// reporting for hidden modules.
+// We only care for modules that got deleted or inserted between our scan and if
+// we detected something suspicious. Since it's a very small time frame, it's
+// not likely that a large amount of modules will be deleted. Instead of saving
+// a map of deleted modules, we could have saved the last deleted module
+// timestamp and, if we detected something suspicious, verify that no modules
+// got deleted between our check. This is preferable space-wise (u64 instead of
+// a map), but an attacker might start unloading modules in the background and
+// race with the check in order to abort reporting for hidden modules.
+
 BPF_LRU_HASH(recent_deleted_module_map, u64, kernel_deleted_mod_t, 50);
 BPF_LRU_HASH(recent_inserted_module_map,
              u64,
@@ -626,25 +627,27 @@ void __always_inline lkm_seeker_send_to_userspace(struct module *mod, u32 *flags
     save_bytes_to_buf(p->event,
                       (void *) mod_name,
                       MODULE_NAME_LEN & MAX_MEM_DUMP_SIZE,
-                      1); // this is actually a string, the argument is saved as bytes since the
-                          // verifier didn't like it as str
+                      1); // string saved as bytes (verifier issues).
     save_to_submit_buf(p->event, flags, sizeof(u32), 2);
     save_bytes_to_buf(p->event,
                       (void *) mod_srcversion,
                       MODULE_SRCVERSION_MAX_LENGTH & MAX_MEM_DUMP_SIZE,
-                      3); // this is actually a string, the argument is saved as bytes since the
-                          // verifier didn't like it as str
+                      3); // string saved as bytes (verifier issues).
 
     events_perf_submit(p, HIDDEN_KERNEL_MODULE_SEEKER, 0);
 }
 
-// Populate all the modules to an efficient query-able hash map.
-// We can't read it once and then hook on do_init_module and free_module since a hidden module will
-// remove itself from the list directly and we wouldn't know (hence from our perspective the module
-// will reside in the modules list, which could be false). So on every trigger, we go over the
-// modules list and populate the map. It gets clean in userspace before every run.
-// Since this mechanism is suppose to be triggered every once in a while,
-// this should be ok.
+//
+// Populate all the modules to an efficient query-able hash map: We can't read
+// it once and then hook on do_init_module and free_module, since a hidden module
+// will remove itself from the list directly, and we wouldn't know (hence from
+// our perspective the module will reside in the modules list, which could be
+// false).
+//
+// So on every trigger, we go over the modules list and populate the
+// map. It gets clean in userspace before every run.  Since this mechanism is
+// suppose to be triggered every once in a while, this should be ok.
+//
 static __always_inline bool init_shown_modules()
 {
     char modules_sym[8] = "modules";
@@ -690,8 +693,8 @@ static __always_inline bool is_hidden(u64 mod)
     // Verify that this module wasn't removed after we initialized modules_map
     kernel_deleted_mod_t *deleted_mod = bpf_map_lookup_elem(&recent_deleted_module_map, &mod);
     if (deleted_mod && deleted_mod->deleted_time > start_scan_time_init_shown_mods) {
-        // This module got deleted after the start of the scan time.. So there was a valid remove,
-        // and it's not hidden.
+        // This module got deleted after the start of the scan time.. So there
+        // was a valid remove, and it's not hidden.
         return false;
     }
 
@@ -743,15 +746,12 @@ static __always_inline bool find_modules_from_module_kset_list(program_data_t *p
     return !finished_iterating;
 }
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 20, 0) || defined(CORE)
 BPF_QUEUE(walk_mod_tree_queue, rb_node_t, MAX_NUM_MODULES); // used to walk a rb tree
 
-    #ifdef CORE // in non CORE builds it's already defined
 static __always_inline struct latch_tree_node *__lt_from_rb(struct rb_node *node, int idx)
 {
     return container_of(node, struct latch_tree_node, node[idx]);
 }
-    #endif
 
 static __always_inline bool walk_mod_tree(program_data_t *p, struct rb_node *root, int idx)
 {
@@ -782,8 +782,7 @@ static __always_inline bool walk_mod_tree(program_data_t *p, struct rb_node *roo
                     lkm_seeker_send_to_userspace(mod, &flags, p);
                 }
 
-                /* We have visited the node and its left subtree.
-                Now, it's right subtree's turn */
+                // visited node and its left subtree, now it's right subtree's turn!
                 curr = READ_KERN(curr->rb_right);
             }
         }
@@ -812,7 +811,6 @@ static __always_inline bool find_modules_from_mod_tree(program_data_t *p)
 
     return walk_mod_tree(p, node, seq & 1);
 }
-#endif
 
 static __always_inline u64 check_new_mods_only(program_data_t *p)
 {
@@ -867,36 +865,47 @@ static __always_inline bool check_is_proc_modules_hooked(program_data_t *p)
 
         u64 mod = (u64) pos;
         mod_from_map = bpf_map_lookup_elem(&modules_map, &mod);
+
         if ((mod_from_map == NULL) || (mod_from_map != NULL && !mod_from_map->seen_proc_modules)) {
-            // Was there any recent insertion of a module since we populated modules_list? if so,
-            // don't report as there's possible race condition. Note that this granularity
-            // (insertion of any module and not just this particular module) is only for
-            // /proc/modules logic, since there's a context switch between userspace to kernel
-            // space, it opens a window for more modules to get inserted/deleted, and then the LRU
-            // size is not enough - modules get evicted and we report a false-positive. We don't
-            // really want the init_shown_mods time, but the time proc modules map was filled
-            // (userspace) - so assume it happened max 2 seconds prior to that.
+
+            // Was there any recent insertion of a module since we populated
+            // modules_list? if so, don't report as there's possible race
+            // condition. Note that this granularity (insertion of any module
+            // and not just this particular module) is only for /proc/modules
+            // logic, since there's a context switch between userspace to kernel
+            // space, it opens a window for more modules to get
+            // inserted/deleted, and then the LRU size is not enough - modules
+            // get evicted and we report a false-positive. We don't really want
+            // the init_shown_mods time, but the time proc modules map was
+            // filled (userspace) - so assume it happened max 2 seconds prior to
+            // that.
+
             if (start_scan_time_init_shown_mods - (2 * 1000000000) < last_module_insert_time) {
                 continue;
             }
 
-            // Check again with the address being the start of the memory area, since
-            // there's a chance the module is in /proc/modules but not in /proc/kallsyms (since the
-            // file can be hooked).
+            // Check again with the address being the start of the memory area,
+            // since there's a chance the module is in /proc/modules but not in
+            // /proc/kallsyms (since the file can be hooked).
+            
             mod = (u64) READ_KERN(pos->core_layout.base);
             mod_from_map = bpf_map_lookup_elem(&modules_map, &mod);
-            // No need to check for seen_proc_modules flag here since if it IS in the map
-            // with the address being the start of the memory area, it necessarily got inserted
-            // to the map via the /proc/modules userspace logic.
+
+            // No need to check for seen_proc_modules flag here since if it IS
+            // in the map with the address being the start of the memory area,
+            // it necessarily got inserted to the map via the /proc/modules
+            // userspace logic.
+
             if (mod_from_map == NULL) {
                 // Module was not seen in proc modules, report.
                 lkm_seeker_send_to_userspace(pos, &flags, p);
             }
 
-            // We couldn't resolve the address from kallsyms but we did see the module in
-            // /proc/modules. This probably means that /proc/kallsyms is hooked, but we consider
-            // this module not hidden, as tools like lsmod will show it. Thus we gracefully continue
-            // and don't report this.
+            // We couldn't resolve the address from kallsyms but we did see the
+            // module in /proc/modules. This probably means that /proc/kallsyms
+            // is hooked, but we consider this module not hidden, as tools like
+            // lsmod will show it. Thus we gracefully continue and don't report
+            // this.
         }
     }
 

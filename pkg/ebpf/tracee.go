@@ -1452,7 +1452,12 @@ const pollTimeout int = 300
 
 // Run starts the trace. it will run until ctx is cancelled
 func (t *Tracee) Run(ctx gocontext.Context) error {
+	// Some "informational" events are started here (TODO: API server?)
+
 	t.invokeInitEvents()
+
+	// Some events need initialization before the perf buffers are polled
+
 	t.triggerSyscallsIntegrityCheck(trace.Event{})
 	t.triggerSeqOpsIntegrityCheck(trace.Event{})
 	err := t.triggerMemDump(trace.Event{})
@@ -1462,29 +1467,39 @@ func (t *Tracee) Run(ctx gocontext.Context) error {
 
 	go t.lkmSeekerRoutine(ctx)
 
-	t.eventsPerfMap.Poll(pollTimeout)
-	go t.processLostEvents() // its termination is signaled by closing t.done
+	// Main event loop (polling events perf buffer)
 
+	t.eventsPerfMap.Poll(pollTimeout)
+
+	go t.processLostEvents() // termination signaled by closing t.done
 	go t.handleEvents(ctx)
+
+	// Parallel perf buffer with file writes events
+
 	if t.config.BlobPerfBufferSize > 0 {
 		t.fileWrPerfMap.Poll(pollTimeout)
 		go t.processFileWrites(ctx)
 	}
+
+	// Network capture perf buffer (similar to regular pipeline)
+
 	if pcaps.PcapsEnabled(t.config.Capture.Net) {
 		t.netCapPerfMap.Poll(pollTimeout)
 		go t.processNetCaptureEvents(ctx)
 	}
+
+	// Logging perf buffer
+
 	t.bpfLogsPerfMap.Poll(pollTimeout)
 	go t.processBPFLogs(ctx)
 
-	// set running state after writing pid file
-	t.running.Store(true)
+	// Management
 
-	// executes ready callback, non blocking
-	t.ready(ctx)
+	t.running.Store(true) // set running state after writing pid file
+	t.ready(ctx)          // executes ready callback, non blocking
+	<-ctx.Done()          // block until ctx is cancelled elsewhere
 
-	// block until ctx is cancelled elsewhere
-	<-ctx.Done()
+	// Stop perf buffers
 
 	t.eventsPerfMap.Stop()
 	if t.config.BlobPerfBufferSize > 0 {
@@ -1494,6 +1509,8 @@ func (t *Tracee) Run(ctx gocontext.Context) error {
 		t.netCapPerfMap.Stop()
 	}
 	t.bpfLogsPerfMap.Stop()
+
+	// TODO: move logic below somewhere else (related to file writes)
 
 	// record index of written files
 	if t.config.Capture.FileWrite {
@@ -1525,7 +1542,8 @@ func (t *Tracee) Run(ctx gocontext.Context) error {
 		}
 	}
 
-	t.Close()
+	t.Close() // close Tracee
+
 	return nil
 }
 
