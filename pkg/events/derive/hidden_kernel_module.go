@@ -12,6 +12,7 @@ import (
 	"unsafe"
 
 	lru "github.com/hashicorp/golang-lru"
+	"kernel.org/pub/linux/libs/security/libcap/cap"
 
 	bpf "github.com/aquasecurity/libbpfgo"
 	"github.com/aquasecurity/libbpfgo/helpers"
@@ -145,38 +146,43 @@ func newModsCheckForHidden(startScanTime uint64, flags uint32) error {
 	//
 	return capabilities.GetInstance().EBPF(
 		func() error {
-			var iter = newModuleOnlyMap.Iterator()
-			for iter.Next() {
-				addr := binary.LittleEndian.Uint64(iter.Key())
-				curVal, err := newModuleOnlyMap.GetValue(unsafe.Pointer(&addr))
-				if err != nil {
-					return err
-				}
-				insertTime := binary.LittleEndian.Uint64(curVal[0:8])
-				lastSeenTime := binary.LittleEndian.Uint64(curVal[8:16])
-				if insertTime <= startScanTime && lastSeenTime < startScanTime {
-					// It was inserted before the current scan, and we did not
-					// see it in the scan: it is hidden. The receiving end will
-					// receive the message, trigger the lkm seeker submitter
-					// with a specific hidden module
-					//
-					// Note that we haven't really checked if the module is in
-					// the cache before, as we only have the address now.
-					//
-					if _, found := foundHiddenKernModsCache.Get(addr); !found {
-						// It's hidden, and not reported before, report
-						wakeupChannel <- ScanRequest{Address: addr, Flags: flags}
+			return capabilities.GetInstance().Specific(
+				func() error {
+					var iter = newModuleOnlyMap.Iterator()
+					for iter.Next() {
+						addr := binary.LittleEndian.Uint64(iter.Key())
+						curVal, err := newModuleOnlyMap.GetValue(unsafe.Pointer(&addr))
+						if err != nil {
+							return err
+						}
+						insertTime := binary.LittleEndian.Uint64(curVal[0:8])
+						lastSeenTime := binary.LittleEndian.Uint64(curVal[8:16])
+						if insertTime <= startScanTime && lastSeenTime < startScanTime {
+							// It was inserted before the current scan, and we did not
+							// see it in the scan: it is hidden. The receiving end will
+							// receive the message, trigger the lkm seeker submitter
+							// with a specific hidden module
+							//
+							// Note that we haven't really checked if the module is in
+							// the cache before, as we only have the address now.
+							//
+							if _, found := foundHiddenKernModsCache.Get(addr); !found {
+								// It's hidden, and not reported before, report
+								wakeupChannel <- ScanRequest{Address: addr, Flags: flags}
+							}
+						}
 					}
-				}
-			}
 
-			err := iter.Err()
-			if err != nil {
-				logger.Errorw("clearMap iterator received an error", "error", err.Error())
-				return iter.Err()
-			}
+					err := iter.Err()
+					if err != nil {
+						logger.Errorw("clearMap iterator received an error", "error", err.Error())
+						return iter.Err()
+					}
 
-			return nil
+					return nil
+				},
+				cap.SYS_ADMIN, // For kernels below 5.8
+			)
 		},
 	)
 }
@@ -205,22 +211,27 @@ func InitHiddenKernelModules(
 func clearMap(bpfMap *bpf.BPFMap) error {
 	return capabilities.GetInstance().EBPF(
 		func() error {
-			var err error
-			var iter = bpfMap.Iterator()
-			for iter.Next() {
-				addr := binary.LittleEndian.Uint64(iter.Key())
-				err = bpfMap.DeleteKey(unsafe.Pointer(&addr))
-				if err != nil {
-					logger.Errorw("Err occurred DeleteKey: " + err.Error())
-					return err
-				}
-			}
-			err = iter.Err()
-			if err != nil {
-				logger.Errorw("ClearMap iterator received an error", "error", err.Error())
-				return iter.Err()
-			}
-			return nil
+			return capabilities.GetInstance().Specific(
+				func() error {
+					var err error
+					var iter = bpfMap.Iterator()
+					for iter.Next() {
+						addr := binary.LittleEndian.Uint64(iter.Key())
+						err = bpfMap.DeleteKey(unsafe.Pointer(&addr))
+						if err != nil {
+							logger.Errorw("Err occurred DeleteKey: " + err.Error())
+							return err
+						}
+					}
+					err = iter.Err()
+					if err != nil {
+						logger.Errorw("ClearMap iterator received an error", "error", err.Error())
+						return iter.Err()
+					}
+					return nil
+				},
+				cap.SYS_ADMIN, // For kernels below 5.8
+			)
 		},
 	)
 }
