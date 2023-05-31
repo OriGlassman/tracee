@@ -16,6 +16,8 @@ import (
 	bpf "github.com/aquasecurity/libbpfgo"
 	"github.com/aquasecurity/libbpfgo/helpers"
 
+	"kernel.org/pub/linux/libs/security/libcap/cap"
+
 	"github.com/aquasecurity/tracee/pkg/capabilities"
 	"github.com/aquasecurity/tracee/pkg/events"
 	"github.com/aquasecurity/tracee/pkg/events/parse"
@@ -143,7 +145,7 @@ func newModsCheckForHidden(startScanTime uint64, flags uint32) error {
 	// sends it back to userspace, this time with flags that will cause it to
 	// get submitted to the user as an event,
 	//
-	return capabilities.GetInstance().EBPF(
+	return capabilities.GetInstance().Specific(
 		func() error {
 			var iter = newModuleOnlyMap.Iterator()
 			for iter.Next() {
@@ -178,6 +180,7 @@ func newModsCheckForHidden(startScanTime uint64, flags uint32) error {
 
 			return nil
 		},
+		cap.SYS_ADMIN,
 	)
 }
 
@@ -203,7 +206,7 @@ func InitHiddenKernelModules(
 
 // clearMap a utility to clear a map
 func clearMap(bpfMap *bpf.BPFMap) error {
-	return capabilities.GetInstance().EBPF(
+	return capabilities.GetInstance().Specific(
 		func() error {
 			var err error
 			var iter = bpfMap.Iterator()
@@ -222,6 +225,7 @@ func clearMap(bpfMap *bpf.BPFMap) error {
 			}
 			return nil
 		},
+		cap.SYS_ADMIN,
 	)
 }
 
@@ -240,7 +244,7 @@ func ClearModulesState() {
 // FillModulesFromProcFs fills a map with modules from /proc/modules, to be
 // checked in kernel-space for inconsistencies.
 func FillModulesFromProcFs(kernelSymbols helpers.KernelSymbolTable) error {
-	return capabilities.GetInstance().EBPF(
+	return capabilities.GetInstance().Specific( // EBPF ring is not enough
 		func() error {
 			file, err := os.Open("/proc/modules")
 			if err != nil {
@@ -303,5 +307,6 @@ func FillModulesFromProcFs(kernelSymbols helpers.KernelSymbolTable) error {
 
 			return nil
 		},
+		cap.SYS_ADMIN,
 	)
 }
