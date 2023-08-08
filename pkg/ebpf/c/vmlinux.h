@@ -677,6 +677,7 @@ enum bpf_func_id
     BPF_FUNC_for_each_map_elem = 164,
 };
 
+#define KSYM_SYMBOL_LEN 282
 #define MODULE_NAME_LEN (64 - sizeof(unsigned long))
 
 struct module_kobject {
@@ -922,6 +923,14 @@ struct k_sigaction {
 
 struct sighand_struct {
     struct k_sigaction action[_NSIG];
+};
+
+struct fprobe {
+    unsigned int flags;
+    int (*entry_handler)(struct fprobe *fp, unsigned long entry_ip,
+			     struct pt_regs *regs, void *entry_data);
+	void (*exit_handler)(struct fprobe *fp, unsigned long entry_ip,
+			     struct pt_regs *regs, void *entry_data);
 };
 
 enum bpf_cmd

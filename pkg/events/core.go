@@ -102,6 +102,7 @@ const (
 	HiddenKernelModuleSeeker
 	ModuleLoad
 	ModuleFree
+	RegisterFprobe
 	MaxCommonID
 )
 
@@ -10525,6 +10526,23 @@ var CoreEvents = map[ID]Definition{
 			{Type: "int", Name: "kernel_invoked"},
 			{Type: "const char*const*", Name: "binary.arguments"},
 			{Type: "const char*const*", Name: "environment"},
+		},
+	},
+	RegisterFprobe: {
+		id:      RegisterFprobe,
+		id32Bit: Sys32Undefined,
+		name:    "register_fprobe",
+		sets:    []string{},
+		dependencies: Dependencies{
+			probes: []Probe{
+				{handle: probes.RegisterFprobe, required: true},
+				{handle: probes.RegisterFprobeIps, required: true},
+			},
+		},
+		params: []trace.ArgMeta{
+			{Type: "const char*", Name: "hooked_function"},
+			{Type: "const char*", Name: "entry_handler"},
+			{Type: "const char*", Name: "exit_handler"},
 		},
 	},
 	//

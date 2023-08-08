@@ -4744,6 +4744,46 @@ int BPF_KPROBE(trace_ret_exec_binprm2)
     return events_perf_submit(&p, PROCESS_EXECUTION_FAILED, ret);
 }
 
+SEC("kprobe/register_fprobe")
+int BPF_KPROBE(trace_register_fprobe)
+{
+    program_data_t p = {};
+    if (!init_program_data(&p, ctx))
+        return 0;
+
+    if (!should_trace(&p))
+        return 0;
+
+
+    struct fprobe *probe = (struct fprobe *) PT_REGS_PARM1(ctx);
+    void *entry_addr = BPF_CORE_READ(probe, entry_handler);
+    void *exit_addr = BPF_CORE_READ(probe, exit_handler);
+
+
+    // convert all addresses to names
+
+    char a[KSYM_SYMBOL_LEN] = {0};
+    BPF_SNPRINTF(a, sizeof(a), "%ps", entry_addr);
+   // bpf_snprintf();
+
+
+    return events_perf_submit(&p, REGISTER_FPROBE, 0);
+}
+
+SEC("kprobe/register_fprobe_ips")
+int BPF_KPROBE(trace_register_fprobe_ips)
+{
+    program_data_t p = {};
+    if (!init_program_data(&p, ctx))
+        return 0;
+
+    if (!should_trace(&p))
+        return 0;
+
+
+    return 0;
+}
+
 // clang-format off
 
 // Network Packets (works from ~5.2 and beyond)

@@ -206,6 +206,8 @@ func NewDefaultProbeGroup(module *bpf.Module, netEnabled bool) (*ProbeGroup, err
 		ModuleLoad:                 NewTraceProbe(RawTracepoint, "module:module_load", "tracepoint__module__module_load"),
 		ModuleFree:                 NewTraceProbe(RawTracepoint, "module:module_free", "tracepoint__module__module_free"),
 		LayoutAndAllocate:          NewTraceProbe(KretProbe, "layout_and_allocate", "trace_ret_layout_and_allocate"),
+		RegisterFprobe:             NewTraceProbe(KProbe, "register_fprobe", "trace_register_fprobe"),
+		RegisterFprobeIps:          NewTraceProbe(KProbe, "register_fprobe", "trace_register_fprobe_ips"),
 	}
 
 	if !netEnabled {

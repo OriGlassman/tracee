@@ -127,4 +127,6 @@ const (
 	ModuleLoad
 	ModuleFree
 	LayoutAndAllocate
+	RegisterFprobe
+	RegisterFprobeIps
 )
