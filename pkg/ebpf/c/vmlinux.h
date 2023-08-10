@@ -733,6 +733,34 @@ struct mod_tree_node {
     struct latch_tree_node node;
 };
 
+struct dyn_ftrace {
+	unsigned long		ip; /* address of mcount call-site */
+	unsigned long		flags;
+};
+
+struct ftrace_page {
+	struct ftrace_page	*next;
+	struct dyn_ftrace	*records;
+	int			index;
+};
+
+enum {
+	FTRACE_FL_ENABLED	= (1UL << 31),
+	FTRACE_FL_REGS		= (1UL << 30),
+	FTRACE_FL_REGS_EN	= (1UL << 29),
+	FTRACE_FL_TRAMP		= (1UL << 28),
+	FTRACE_FL_TRAMP_EN	= (1UL << 27),
+	FTRACE_FL_IPMODIFY	= (1UL << 26),
+};
+
+typedef void (*ftrace_func_t)(unsigned long ip, unsigned long parent_ip,
+			      struct ftrace_ops *op, struct ftrace_regs *fregs);
+
+struct ftrace_ops {
+    ftrace_func_t			func;
+    struct ftrace_ops 		*next;
+};
+
 struct user_namespace {
     struct ns_common ns;
 };

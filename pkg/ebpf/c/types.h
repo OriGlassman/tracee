@@ -120,6 +120,7 @@ enum event_id_e
     HIDDEN_KERNEL_MODULE_SEEKER,
     MODULE_LOAD,
     MODULE_FREE,
+    FTRACE_HOOK,
     MAX_EVENT_ID,
 };
 

@@ -886,11 +886,17 @@ statfunc int check_is_proc_modules_hooked(program_data_t *p)
     return ret;
 }
 
-statfunc bool kern_ver_below_min_lkm(struct pt_regs *ctx)
+enum kernel_version {
+    v5_2 = 1,
+    v5_17,
+};
+
+statfunc bool kern_ver_below_min(struct pt_regs *ctx, enum kernel_version version)
 {
-    // If we're below kernel version 5.2, propogate error to userspace and return
-    if (!bpf_core_enum_value_exists(enum bpf_func_id, BPF_FUNC_sk_storage_get)) {
+    if (version == v5_2 && !bpf_core_enum_value_exists(enum bpf_func_id, BPF_FUNC_sk_storage_get)) {
         goto below_threshold;
+    } else if (version == v5_17) { //TODO ori
+        
     }
 
     return false; // lkm seeker may run!
@@ -908,7 +914,7 @@ SEC("uprobe/lkm_seeker_submitter")
 int uprobe_lkm_seeker_submitter(struct pt_regs *ctx)
 {
     // This check is to satisfy the verifier for kernels older than 5.2
-    if (kern_ver_below_min_lkm(ctx))
+    if (kern_ver_below_min(ctx, v5_2))
         return 0;
 
     u64 mod_address = 0;
@@ -948,7 +954,7 @@ int uprobe_lkm_seeker_submitter(struct pt_regs *ctx)
 SEC("uprobe/lkm_seeker")
 int uprobe_lkm_seeker(struct pt_regs *ctx)
 {
-    if (kern_ver_below_min_lkm(ctx))
+    if (kern_ver_below_min(ctx, v5_2))
         return 0;
 
     program_data_t p = {};
@@ -982,7 +988,7 @@ int lkm_seeker_proc_tail(struct pt_regs *ctx)
 {
     // This check is to satisfy the verifier for kernels older than 5.2
     // as in runtime we'll never get here (the tail call doesn't happen)
-    if (kern_ver_below_min_lkm(ctx))
+    if (kern_ver_below_min(ctx, v5_2))
         return 0;
 
     program_data_t p = {};
@@ -1005,7 +1011,7 @@ int lkm_seeker_kset_tail(struct pt_regs *ctx)
 {
     // This check is to satisfy the verifier for kernels older than 5.2
     // as in runtime we'll never get here (the tail call doesn't happen)
-    if (kern_ver_below_min_lkm(ctx))
+    if (kern_ver_below_min(ctx, v5_2))
         return 0;
 
     program_data_t p = {};
@@ -1027,7 +1033,7 @@ int lkm_seeker_mod_tree_tail(struct pt_regs *ctx)
 {
     // This check is to satisfy the verifier for kernels older than 5.2
     // as in runtime we'll never get here (the tail call doesn't happen)
-    if (kern_ver_below_min_lkm(ctx))
+    if (kern_ver_below_min(ctx, v5_2))
         return 0;
 
     program_data_t p = {};
@@ -1053,7 +1059,7 @@ int lkm_seeker_new_mod_only_tail(struct pt_regs *ctx)
 {
     // This check is to satisfy the verifier for kernels older than 5.2
     // as in runtime we'll never get here (the tail call doesn't happen)
-    if (kern_ver_below_min_lkm(ctx))
+    if (kern_ver_below_min(ctx, v5_2))
         return 0;
 
     program_data_t p = {};
@@ -3452,6 +3458,114 @@ SEC("kretprobe/register_kprobe")
 int BPF_KPROBE(trace_ret_register_kprobe)
 {
     return arm_kprobe_handler(ctx);
+}
+
+struct ftrace_page_ctx {
+    program_data_t *p; // So we'll be able to send events while looping
+    struct ftrace_page *curr;
+};
+
+
+
+statfunc struct ftrace_ops* ftrace_check_tramp() {
+    
+}
+
+statfunc long go_over_ftrace_records(u32 index, void *ctx) {
+    struct ftrace_page_ctx *ftrace_page_ctx = (struct ftrace_page_ctx *) ctx;
+    struct ftrace_page *curr = ftrace_page_ctx->curr;
+
+    if (index == BPF_CORE_READ(curr, index)) {
+        return 1;
+    }
+
+    struct dyn_ftrace *records = BPF_CORE_READ(curr, records);
+    struct dyn_ftrace *rec = &records[index];
+    unsigned long flags = BPF_CORE_READ(rec, flags);
+    if (flags & FTRACE_FL_ENABLED) {
+        unsigned long ip = BPF_CORE_READ(rec, ip);
+        unsigned long flags = BPF_CORE_READ(rec, flags);
+
+        char symbol[MAX_KSYM_NAME_SIZE] = {0};
+        BPF_SNPRINTF(symbol, sizeof(symbol), "%pS", ip);
+
+        if (flags & FTRACE_FL_TRAMP_EN) {
+            struct ftrace_ops *ops = ftrace_check_tramp(rec);
+        } else {
+            //add_trampoline_func(m, NULL, rec);
+        }
+        
+
+        program_data_t *p = ftrace_page_ctx->p;
+        reset_event_args(p);
+
+        save_str_to_buf(&p->event->args_buf, symbol, 0);
+        save_to_submit_buf(&p->event->args_buf, (void *) &flags, sizeof(unsigned long), 1);
+
+        events_perf_submit(p, FTRACE_HOOK, 0);
+        bpf_printk("a\n");
+    }
+
+    return 0;
+}
+
+statfunc long go_over_ftrace_pages(u32 index, void *ctx) {
+    struct ftrace_page_ctx *ftrace_page_ctx = (struct ftrace_page_ctx *) ctx;
+    struct ftrace_page *curr = ftrace_page_ctx->curr;
+
+    if (curr == NULL) {
+        bpf_printk("outer: %u\n", index);
+        return 1; // stop iterating - finished
+    }
+
+    bpf_loop(600000, go_over_ftrace_records, ftrace_page_ctx, 0);
+
+    ftrace_page_ctx->curr = BPF_CORE_READ(curr, next);
+
+    return 0;
+}
+
+statfunc int check_ftrace_hooks(program_data_t *p) {
+    char ftrace_start_sym[19] = "ftrace_pages_start";
+    struct ftrace_page *ftrace_pages_start = (struct ftrace_page *) get_symbol_addr(ftrace_start_sym);
+    if (ftrace_pages_start == NULL) {
+        return -1;
+    }
+    struct ftrace_page_ctx ctx = {.p = p, .curr = ftrace_pages_start};
+
+    bpf_loop(1000, go_over_ftrace_pages, &ctx, 0);
+
+    return 0;
+}
+
+SEC("uprobe/ftrace_hook")
+int uprobe_ftrace_hook(struct pt_regs *ctx)
+{
+    bpf_printk("triggered\n");
+    if (kern_ver_below_min(ctx, v5_17))
+        return 0;
+
+    program_data_t p = {};
+    if (!init_program_data(&p, ctx))
+        return 0;
+
+    // Uprobes are not triggered by syscalls, so we need to override the false value.
+    p.event->context.syscall = NO_SYSCALL;
+    p.event->context.matched_policies = ULLONG_MAX;
+
+    // uprobe was triggered from other tracee instance
+    if (p.config->tracee_pid != p.task_info->context.pid &&
+        p.config->tracee_pid != p.task_info->context.host_pid) {
+        return 0;
+    }
+
+    int ret = check_ftrace_hooks(&p);
+    if (ret) {
+        tracee_log(ctx, BPF_LOG_LVL_ERROR, BPF_LOG_ID_UNSPEC, ret);
+        return 1;
+    }
+
+    return 0;
 }
 
 SEC("kprobe/security_bpf_map")

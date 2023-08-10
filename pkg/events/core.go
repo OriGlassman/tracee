@@ -102,6 +102,7 @@ const (
 	HiddenKernelModuleSeeker
 	ModuleLoad
 	ModuleFree
+	FtraceHookChecker
 	MaxCommonID
 )
 
@@ -129,6 +130,7 @@ const (
 	SymbolsLoaded
 	SymbolsCollision
 	HiddenKernelModule
+	FtraceHook
 	MaxUserSpace
 )
 
@@ -10117,6 +10119,40 @@ var CoreEvents = map[ID]Definition{
 			{Type: "const char*", Name: "name"},
 			{Type: "const char*", Name: "version"},
 			{Type: "const char*", Name: "src_version"},
+		},
+	},
+	FtraceHook: {
+		id:      FtraceHook,
+		id32Bit: Sys32Undefined,
+		name:    "ftrace_hook",
+		dependencies: Dependencies{
+			ids: []ID{
+				FtraceHookChecker,
+			},
+		},
+		sets: []string{},
+		params: []trace.ArgMeta{
+			{Type: "const char*", Name: "symbol"},
+			{Type: "unsigned long", Name: "flags"},
+		},
+	},
+	FtraceHookChecker: {
+		id:       FtraceHookChecker,
+		id32Bit:  Sys32Undefined,
+		name:     "ftrace_hook_checker",
+		internal: true,
+		dependencies: Dependencies{
+			probes: []Probe{
+				{handle: probes.FtraceHook, required: true},
+			},
+			kSymbols: []KSymbol{
+				{symbol: "ftrace_pages_start", required: true},
+			},
+		},
+		sets: []string{},
+		params: []trace.ArgMeta{
+			{Type: "const char*", Name: "symbol"},
+			{Type: "unsigned long", Name: "flags"},
 		},
 	},
 	SocketAccept: {

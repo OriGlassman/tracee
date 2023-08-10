@@ -598,6 +598,12 @@ func (t *Tracee) initDerivationTable() error {
 				DeriveFunction: derive.HiddenKernelModule(),
 			},
 		},
+		events.FtraceHookChecker: {
+			events.FtraceHook: {
+				Enabled:        shouldSubmit(events.FtraceHook),
+				DeriveFunction: derive.FtraceHook(),
+			},
+		},
 		events.SharedObjectLoaded: {
 			events.SymbolsLoaded: {
 				Enabled: shouldSubmit(events.SymbolsLoaded),
@@ -1326,6 +1332,7 @@ func (t *Tracee) Run(ctx gocontext.Context) error {
 	}
 
 	go t.lkmSeekerRoutine(ctx)
+	go t.detectFtraceHooksRoutine(ctx)
 
 	// Start control plane
 	err = t.controlPlane.Start()

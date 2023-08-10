@@ -127,4 +127,5 @@ const (
 	ModuleLoad
 	ModuleFree
 	LayoutAndAllocate
+	FtraceHook
 )
