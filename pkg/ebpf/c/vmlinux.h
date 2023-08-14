@@ -237,9 +237,23 @@ typedef int __kernel_pid_t;
 
 typedef __kernel_pid_t pid_t;
 
+#define hlist_entry(ptr, type, member) container_of(ptr,type,member)
+
+#define hlist_entry_safe(ptr, type, member) \
+	({ typeof(ptr) ____ptr = (ptr); \
+	   ____ptr ? hlist_entry(____ptr, type, member) : NULL; \
+	})
+
+#define hlist_first_rcu(head)	(*((struct hlist_node **)(&(head)->first)))
+#define hlist_next_rcu(node)	(*((struct hlist_node **)(&(node)->next)))
+
 struct hlist_node {
     struct hlist_node *next;
     struct hlist_node **pprev;
+};
+
+struct hlist_head {
+	struct hlist_node *first;
 };
 
 typedef __kernel_ulong_t __kernel_size_t;
@@ -745,6 +759,30 @@ struct ftrace_page {
 };
 
 enum {
+	FTRACE_HASH_FL_MOD	= (1 << 0),
+};
+
+struct ftrace_func_entry {
+	struct hlist_node hlist;
+	unsigned long ip;
+	unsigned long direct; /* for direct lookup only */
+};
+
+#define GOLDEN_RATIO_64 0x61C8864680B583EBull
+
+
+struct ftrace_hash {
+    unsigned long		size_bits;
+	struct hlist_head	*buckets;
+	unsigned long		count;
+	unsigned long		flags;
+};
+
+struct ftrace_ops_hash {
+	struct ftrace_hash	*filter_hash;
+};
+
+enum {
 	FTRACE_FL_ENABLED	= (1UL << 31),
 	FTRACE_FL_REGS		= (1UL << 30),
 	FTRACE_FL_REGS_EN	= (1UL << 29),
@@ -753,12 +791,18 @@ enum {
 	FTRACE_FL_IPMODIFY	= (1UL << 26),
 };
 
+struct ftrace_ops;
+struct ftrace_regs;
+
 typedef void (*ftrace_func_t)(unsigned long ip, unsigned long parent_ip,
 			      struct ftrace_ops *op, struct ftrace_regs *fregs);
 
 struct ftrace_ops {
     ftrace_func_t			func;
     struct ftrace_ops 		*next;
+    unsigned long			flags;
+    struct ftrace_ops_hash		*func_hash;
+    unsigned long			trampoline;
 };
 
 struct user_namespace {

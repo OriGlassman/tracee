@@ -3465,10 +3465,119 @@ struct ftrace_page_ctx {
     struct ftrace_page *curr;
 };
 
+struct ftrace_ops_ctx {
+    struct ftrace_ops *curr;
+    struct ftrace_ops *end;
+    unsigned long ip;
+};
 
+struct for_each_hlist_ctx {
+    struct ftrace_func_entry *curr;
+    unsigned long ip;
+};
 
-statfunc struct ftrace_ops* ftrace_check_tramp() {
+statfunc bool ftrace_hash_empty(struct ftrace_hash *hash) {
+    return !hash || !(BPF_CORE_READ(hash, count) || (BPF_CORE_READ(hash, flags) & FTRACE_HASH_FL_MOD));
+}
+
+statfunc long for_each_hlist_entry(u32 index, void *ctx) {
+    struct for_each_hlist_ctx *hlist_ctx = (struct for_each_hlist_ctx *) ctx;
+    struct ftrace_func_entry *entry = hlist_ctx->curr;
+
+    if (!entry) {
+        return 1;
+    }
+
+    if (BPF_CORE_READ(entry, ip) == hlist_ctx->ip) {
+        return 1;
+    }
+
+    //todo
+//    #define hlist_next_rcu(node)	(*((struct hlist_node __rcu **)(&(node)->next)))
+
+    struct hlist_node node = BPF_CORE_READ(entry, hlist);
+    hlist_ctx->curr = hlist_entry_safe(node.next, struct ftrace_func_entry, hlist);
+
+    return 0;
+}
+
+statfunc u32 hash_long(u64 val, unsigned int bits) {
+    return val * GOLDEN_RATIO_64 >> (64 - bits);
+}
+
+statfunc unsigned long ftrace_hash_key(struct ftrace_hash *hash, unsigned long ip) {
+    unsigned long size_bits = BPF_CORE_READ(hash ,size_bits);
+    if (size_bits > 0)
+		return hash_long(ip, size_bits);
+
+	return 0;
+}
+
+statfunc bool __ftrace_lookup_ip(struct ftrace_hash *hash, unsigned long ip) {
+    unsigned long key;
+	struct ftrace_func_entry *start;
+	struct hlist_head hhd;
+    struct hlist_head *phhd;
+    struct hlist_head *buckets;
+
+    key = ftrace_hash_key(hash, ip);
+    buckets = BPF_CORE_READ(hash, buckets);
+    bpf_probe_read_kernel(&hhd, sizeof(struct hlist_head), buckets+key);
+    phhd = &hhd;
+
+    start = hlist_entry_safe(BPF_CORE_READ(phhd, first), struct ftrace_func_entry, hlist);
+    bpf_printk("%lx\n", BPF_CORE_READ(start, ip));
+    // struct for_each_hlist_ctx ctx = {.curr = start, .ip = ip};
+
+    // bpf_loop(1000, for_each_hlist_entry, &ctx, 0);// TODO ori
+
+    //todo ori
+    return 0;
+}
+
+statfunc bool hash_contains_ip(unsigned long ip, struct ftrace_ops_hash *hash) {
+    struct ftrace_hash *filter_hash = BPF_CORE_READ(hash, filter_hash);
+    return ftrace_hash_empty(filter_hash) || __ftrace_lookup_ip(filter_hash, ip);
+}
+
+statfunc long for_each_ftrace_op(u32 index, void *ctx) {
+    struct ftrace_ops_ctx *ops_ctx = (struct ftrace_ops_ctx *) ctx;
+
+    struct ftrace_ops *curr = ops_ctx->curr;
+    // bpf_printk("%u trampoline: %x %llx", index, BPF_CORE_READ(curr, trampoline), curr);
+   // if (BPF_CORE_READ(curr, trampoline)) {
+        if (hash_contains_ip(ops_ctx->ip, BPF_CORE_READ(curr, func_hash))) {
+            bpf_printk("found hash\n");
+            // Found it... curr is the relevant ftrace_ops
+            return 1;
+        }
+    //}
+
+    struct ftrace_ops *next = BPF_CORE_READ(curr, next);
+    if (curr == ops_ctx->end || next == NULL) {
+        // bpf_printk("ended for each ftrace op: %d %d %llx", curr == ops_ctx->end, next==NULL, ops_ctx->end);
+        return 1;
+    }
+
+    ops_ctx->curr = next;
+
+    return 0;
+}
+
+statfunc struct ftrace_ops* ftrace_check_tramp(unsigned long ip) {
+    char ftrace_ops_list_sym[16] = "ftrace_ops_list";
+    struct ftrace_ops *ftrace_ops_list = (struct ftrace_ops *) get_symbol_addr(ftrace_ops_list_sym);
+
+    //bpf_printk("%x %llx %ps\n", BPF_CORE_READ(ftrace_ops_list, flags), BPF_CORE_READ(ftrace_ops_list, func), BPF_CORE_READ(ftrace_ops_list, trampoline));
     
+    char ftrace_list_end_sym[16] = "ftrace_list_end";
+    struct ftrace_ops *ftrace_list_end = (struct ftrace_ops *) get_symbol_addr(ftrace_list_end_sym);
+
+    struct ftrace_ops_ctx ctx = {.curr = ftrace_ops_list, .end = ftrace_list_end, .ip = ip};
+
+    bpf_loop(100000, for_each_ftrace_op, &ctx, 0);// TODO ori
+
+    return ctx.curr;
 }
 
 statfunc long go_over_ftrace_records(u32 index, void *ctx) {
@@ -3486,11 +3595,16 @@ statfunc long go_over_ftrace_records(u32 index, void *ctx) {
         unsigned long ip = BPF_CORE_READ(rec, ip);
         unsigned long flags = BPF_CORE_READ(rec, flags);
 
+        char callback[MAX_KSYM_NAME_SIZE] = {0};
         char symbol[MAX_KSYM_NAME_SIZE] = {0};
         BPF_SNPRINTF(symbol, sizeof(symbol), "%pS", ip);
 
         if (flags & FTRACE_FL_TRAMP_EN) {
-            struct ftrace_ops *ops = ftrace_check_tramp(rec);
+            bpf_printk("TRAMP\n");
+            struct ftrace_ops *ops = ftrace_check_tramp(ip);
+            if (ops) {
+                BPF_SNPRINTF(callback, sizeof(callback), "%pS", BPF_CORE_READ(ops, func));
+            }
         } else {
             //add_trampoline_func(m, NULL, rec);
         }
@@ -3501,9 +3615,10 @@ statfunc long go_over_ftrace_records(u32 index, void *ctx) {
 
         save_str_to_buf(&p->event->args_buf, symbol, 0);
         save_to_submit_buf(&p->event->args_buf, (void *) &flags, sizeof(unsigned long), 1);
+        save_str_to_buf(&p->event->args_buf, callback, 2);
 
         events_perf_submit(p, FTRACE_HOOK, 0);
-        bpf_printk("a\n");
+       // bpf_printk("a\n");
     }
 
     return 0;
@@ -3514,7 +3629,7 @@ statfunc long go_over_ftrace_pages(u32 index, void *ctx) {
     struct ftrace_page *curr = ftrace_page_ctx->curr;
 
     if (curr == NULL) {
-        bpf_printk("outer: %u\n", index);
+        // bpf_printk("outer: %u\n", index);
         return 1; // stop iterating - finished
     }
 
@@ -3533,7 +3648,7 @@ statfunc int check_ftrace_hooks(program_data_t *p) {
     }
     struct ftrace_page_ctx ctx = {.p = p, .curr = ftrace_pages_start};
 
-    bpf_loop(1000, go_over_ftrace_pages, &ctx, 0);
+    bpf_loop(10000, go_over_ftrace_pages, &ctx, 0);
 
     return 0;
 }

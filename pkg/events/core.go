@@ -10134,6 +10134,7 @@ var CoreEvents = map[ID]Definition{
 		params: []trace.ArgMeta{
 			{Type: "const char*", Name: "symbol"},
 			{Type: "unsigned long", Name: "flags"},
+			{Type: "const char*", Name: "callback"},
 		},
 	},
 	FtraceHookChecker: {
@@ -10147,12 +10148,15 @@ var CoreEvents = map[ID]Definition{
 			},
 			kSymbols: []KSymbol{
 				{symbol: "ftrace_pages_start", required: true},
+				{symbol: "ftrace_ops_list", required: true},
+				{symbol: "ftrace_list_end", required: true},
 			},
 		},
 		sets: []string{},
 		params: []trace.ArgMeta{
 			{Type: "const char*", Name: "symbol"},
 			{Type: "unsigned long", Name: "flags"},
+			{Type: "const char*", Name: "callback"},
 		},
 	},
 	SocketAccept: {
