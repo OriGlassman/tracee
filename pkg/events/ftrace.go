@@ -111,6 +111,7 @@ func readSysKernelFile(path string) ([]byte, error) {
 // getFtraceHooksData gets ftrace hooks related data from file
 func getFtraceHooksData() ([]byte, error) {
 	data, err := readSysKernelFile("tracing/enabled_functions")
+	logger.Errorw("ftrace ORI file", "f", string(data))
 	return data, err
 }
 
@@ -219,6 +220,8 @@ func isCausedBySelfLoadedProg(selfLoadedProgs map[string]int, symbol string, old
 			}
 			newCount = numKprobes - numHooksFromTracee // The amount of k[ret]probes other than tracee's
 		}
+		logger.Errorw("ftrace ORI", "symbol", symbol, "newcount", newCount, "oldcount", oldCount,
+			"numkprobes", numKprobes, "numhooksfromtracee", numHooksFromTracee, "map", selfLoadedProgs)
 	}
 
 	return false, newCount, nil
@@ -274,6 +277,7 @@ func numKprobesOnSymbol(ftracedSymbol string) (int, error) {
 	// ffffffff9fd47b60  k  load_elf_phdrs+0x0    [FTRACE]
 	// so we need to address this situation and not mark it as 2 or more different probes
 	dupSymbolMap := map[dupSymbolEntry]string{}
+	logger.Errorw("kprobe list", "symbol", ftracedSymbol, "data", string(data))
 
 	for _, kprobeLine := range strings.Split(string(data), "\n") {
 		if len(kprobeLine) == 0 {

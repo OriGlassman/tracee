@@ -1683,6 +1683,8 @@ func (t *Tracee) getSelfLoadedPrograms(kprobesOnly bool) map[string]int {
 
 				log(definition.GetName(), p.GetProgramName())
 				name = p.GetEventName()
+
+				logger.Errorw("probe ori", "eventname", p.GetEventName(), "progname", p.GetProgramName(), "probtype", p.GetProbeType(), "defiID", definition.GetID())
 			case *probes.Uprobe:
 				log(definition.GetName(), p.GetProgramName())
 				continue
@@ -1694,6 +1696,7 @@ func (t *Tracee) getSelfLoadedPrograms(kprobesOnly bool) map[string]int {
 			}
 
 			selfLoadedPrograms[name]++
+
 		}
 	}
 
