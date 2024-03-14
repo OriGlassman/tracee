@@ -76,6 +76,7 @@ func FtraceHookEvent(eventsCounter counter.Counter, out chan *trace.Event, baseE
 
 		select {
 		case <-FtraceWakeupChan:
+			logger.Errorw("ORI: triggering ftrace!")
 		case <-time.After(utils.GenerateRandomDuration(10, 300)):
 		}
 	}
@@ -159,12 +160,17 @@ func checkFtraceHooks(eventsCounter counter.Counter, out chan *trace.Event, base
 			directArg = true // To be used in the next line (next iteration)
 		}
 
+		logger.Errorw("ORI", "symbol", args[symbolIndex].Value.(string))
+
 		causedByTracee, newCount, err := isCausedBySelfLoadedProg(selfLoadedProgs, args[symbolIndex].Value.(string), args[countIndex].Value.(int))
 		if err != nil {
 			return err
 		}
 
 		if causedByTracee {
+			if args[symbolIndex].Value.(string) == "security_sb_alloc" {
+				logger.Errorw("ORI caused by tracee SKIPPING THIS SHOULD NOT HAPPEN")
+			}
 			continue
 		}
 
@@ -177,6 +183,9 @@ func checkFtraceHooks(eventsCounter counter.Counter, out chan *trace.Event, base
 			if reflect.DeepEqual(existingEntry, args) ||
 				(args[countIndex].Value.(int) < existingEntry[countIndex].Value.(int) &&
 					args[callbackFuncIndex].Value == existingEntry[callbackFuncIndex].Value) {
+				if args[symbolIndex].Value.(string) == "security_sb_alloc" {
+					logger.Errorw("ORI already reported thissymbiol SKIPPING THIS SHOULD NOT HAPPEN")
+				}
 				continue
 			}
 		}
@@ -190,6 +199,9 @@ func checkFtraceHooks(eventsCounter counter.Counter, out chan *trace.Event, base
 
 		out <- &event
 		_ = eventsCounter.Increment()
+		if args[symbolIndex].Value.(string) == "security_sb_alloc" {
+			logger.Errorw("ORI outputted event WHY WE DONT SEE THE EVENT THOUGH?")
+		}
 	}
 
 	return nil
@@ -216,6 +228,10 @@ func isCausedBySelfLoadedProg(selfLoadedProgs map[string]int, symbol string, old
 			}
 			newCount = numKprobes - numHooksFromTracee // The amount of k[ret]probes other than tracee's
 		}
+	}
+
+	if symbol == "security_sb_alloc" {
+		logger.Errorw("ORI", "oldcount", oldCount, "newcount", newCount, "numhooksfromtracee", numHooksFromTracee)
 	}
 
 	return false, newCount, nil
