@@ -73,6 +73,7 @@ func (t *Tracee) lkmSeekerRoutine(ctx gocontext.Context) {
 	for {
 		if run {
 			if throttleTimer != nil {
+				logger.Infow("throttled!")
 				run = false
 				continue // A run is scheduled in the future, so don't run yet
 			}
@@ -86,6 +87,7 @@ func (t *Tracee) lkmSeekerRoutine(ctx gocontext.Context) {
 						lastTriggerTime.Add(throttleSecs * time.Second),
 					),
 				)
+				logger.Infow("Throttelling!")
 				run = false
 				continue
 			}
@@ -100,8 +102,10 @@ func (t *Tracee) lkmSeekerRoutine(ctx gocontext.Context) {
 			// Prepare throttle timer
 			lastTriggerTime = time.Now()
 
+			logger.Infow("triggering logic now!")
 			// Run kernel logic
 			t.triggerKernelModuleSeeker()
+			logger.Infow("logic over!")
 
 			// Clear eBPF maps
 			err := derive.ClearModulesState()
@@ -114,20 +118,25 @@ func (t *Tracee) lkmSeekerRoutine(ctx gocontext.Context) {
 		} else {
 			select {
 			case <-ctx.Done():
+				logger.Infow("context killed me!")
 				return
 
 			case <-time.After(utils.GenerateRandomDuration(10, 300)):
+				logger.Infow("woke up from sleep.. suppose to ru now")
 				run = true // Run from time to time.
 
 			case <-throttleTimer:
+				logger.Infow("throttle timer over.. suppose to run now")
 				throttleTimer = nil // Cool-down period ended...
 				run = true          // ...run now!
 
 			case scanReq := <-wakeupChan:
 				if scanReq.Flags&derive.FullScan != 0 {
 					run = true
+					logger.Infow("full scan")
 				} else if scanReq.Flags&derive.NewMod != 0 {
 					run = false
+					logger.Infow("new mod submit", "addr", scanReq.Address, "flags", uint64(scanReq.Flags))
 					t.triggerKernelModuleSubmitter(scanReq.Address, uint64(scanReq.Flags))
 				} else {
 					logger.Errorw("lkm_seeker: unexpected flags", "flags", scanReq.Flags)
