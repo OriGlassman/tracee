@@ -68,29 +68,33 @@ func deriveHiddenKernelModulesArgs() multiDeriveArgsFunction {
 		}
 
 		a := fmt.Sprintf("%x", address)
-		logger.Infow("ORI: derive event", "flags", flags, "address", a)
 		// revive:disable
 
 		if flags&HiddenModule != 0 {
+			logger.Infow("found hidden module continue to submission")
 			// Empty-block needed: continue an event to user submission.
 		} else if flags&FullScan != 0 {
 			// No need to send the address: doing a full generic scan.
+			logger.Infow("sending msg to do a full scan (generated from ret do_init_module of addr", "addr", a)
 			wakeupChannel <- ScanRequest{Flags: flags}
 			return nil, nil
 		} else if flags&NewMod != 0 {
 			// Address field unused in this case: use it as start scan time then.
 			startScanTime := address
+			logger.Infow("starting new mod check!")
 			err := newModsCheckForHidden(startScanTime, flags)
 			if err != nil {
 				return nil, []error{err}
 			}
 			return nil, nil
 		} else if flags&kset != 0 || flags&modTree != 0 {
+			logger.Infow("kset or modtree scan")
 			// These types of scan only happens once on tracee's startup.
 			// Cache results and only send them out when receiving that the history scan finished successfully
 			eventsFromHistoryScan.Add(&event, struct{}{})
 			return nil, nil
 		} else if flags&historyScanFinished != 0 {
+			logger.Infow("history scan finished")
 			// Happens only once on tracee's startup when the scan finished (successfully/unsuccessfully)
 			return handleHistoryScanFinished(address)
 		}
@@ -99,6 +103,7 @@ func deriveHiddenKernelModulesArgs() multiDeriveArgsFunction {
 
 		// Add to cache not to report it multiple times
 		foundHiddenKernModsCache.Add(address, struct{}{})
+		logger.Infow("ADDED TO CACHE: REPORTING EVENT")
 
 		return [][]interface{}{extractFromEvent(event.Args, address)}, nil
 	}
@@ -218,6 +223,7 @@ func newModsCheckForHidden(startScanTime uint64, flags uint32) error {
 				hexaddr := fmt.Sprintf("%x", addr)
 				logger.Infow("ORIII", "addr", hexaddr, "insertTime", insertTime, "startScanTime", startScanTime, "lastSeenTime", lastSeenTime)
 				if insertTime <= startScanTime && lastSeenTime < startScanTime {
+					logger.Infow("inside.. checking cache now")
 					// It was inserted before the current scan, and we did not
 					// see it in the scan: it is hidden. The receiving end will
 					// receive the message, trigger the lkm seeker submitter
@@ -227,6 +233,7 @@ func newModsCheckForHidden(startScanTime uint64, flags uint32) error {
 					// the cache before, as we only have the address now.
 					//
 					if _, found := foundHiddenKernModsCache.Get(addr); !found {
+						logger.Infow("hidden.. REPORT IN CHANNEL")
 						// It's hidden, and not reported before, report
 						wakeupChannel <- ScanRequest{Address: addr, Flags: flags}
 					}

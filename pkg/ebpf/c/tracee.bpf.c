@@ -1138,6 +1138,8 @@ int uprobe_lkm_seeker(struct pt_regs *ctx)
     program_data_t p = {};
     if (!init_program_data(&p, ctx, HIDDEN_KERNEL_MODULE_SEEKER))
         return 0;
+    
+    bpf_printk("lkm seeker");
 
     // Uprobes are not triggered by syscalls, so we need to override the false value.
     p.event->context.syscall = NO_SYSCALL;
@@ -1179,6 +1181,8 @@ int lkm_seeker_kset_tail(struct pt_regs *ctx)
     if (!init_tailcall_program_data(&p, ctx))
         return -1;
 
+    bpf_printk("kset");
+
     int ret = find_modules_from_module_kset_list(&p);
     if (ret < 0) {
         tracee_log(ctx, BPF_LOG_LVL_WARN, BPF_LOG_ID_HID_KER_MOD, ret);
@@ -1205,6 +1209,7 @@ int lkm_seeker_mod_tree_tail(struct pt_regs *ctx)
     if (!init_tailcall_program_data(&p, ctx))
         return -1;
 
+    bpf_printk("modtree");
     u32 flags = HISTORY_SCAN_FINISHED;
 
     // This method is efficient only when the kernel is compiled with
@@ -1236,6 +1241,7 @@ int lkm_seeker_proc_tail(struct pt_regs *ctx)
     program_data_t p = {};
     if (!init_tailcall_program_data(&p, ctx))
         return -1;
+     bpf_printk("proc modules");
 
     int ret = check_is_proc_modules_hooked(&p);
     if (ret < 0) {
@@ -1262,6 +1268,7 @@ int lkm_seeker_new_mod_only_tail(struct pt_regs *ctx)
     if (!init_tailcall_program_data(&p, ctx))
         return -1;
 
+     bpf_printk("new mod check");
     u64 start_scan_time = check_new_mods_only(&p);
     if (start_scan_time == 0) {
         tracee_log(ctx, BPF_LOG_LVL_WARN, BPF_LOG_ID_HID_KER_MOD, HID_MOD_UNCOMPLETED_ITERATIONS);
