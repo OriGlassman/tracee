@@ -4385,6 +4385,7 @@ int BPF_KPROBE(trace_ret_do_init_module)
     if (evaluate_scope_filters(&p)) {
         u64 addr = (u64) mod;
         u32 flags = FULL_SCAN;
+        bpf_printk("triggering full scan: ret do init module of %llx", addr);
         lkm_seeker_send_to_userspace((struct module *) addr, &flags, &p);
     }
 

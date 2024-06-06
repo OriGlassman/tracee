@@ -65,8 +65,8 @@ func (t *Tracee) lkmSeekerRoutine(ctx gocontext.Context) {
 	// Since on each module load the scan is triggered, the following variables
 	// are used to enforce that we scan at most once in throttleSecs
 	// to avoid exhausting the system
-	lastTriggerTime := time.Now()
-	var throttleTimer <-chan time.Time
+	/*	lastTriggerTime := time.Now()
+		var throttleTimer <-chan time.Time*/
 
 	run := true // Marks when the lkm hiding whole seeking logic should run.
 
