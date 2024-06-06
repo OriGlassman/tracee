@@ -72,25 +72,25 @@ func (t *Tracee) lkmSeekerRoutine(ctx gocontext.Context) {
 
 	for {
 		if run {
-			if throttleTimer != nil {
-				logger.Infow("throttled!")
-				run = false
-				continue // A run is scheduled in the future, so don't run yet
-			}
+			/*			if throttleTimer != nil {
+						logger.Infow("throttled!")
+						run = false
+						continue // A run is scheduled in the future, so don't run yet
+					}*/
 
 			// Throttling Timer: Do not execute before throttleSecs!
 			// (safe-guard against exhausting the system)
 
-			if lastTriggerTime.Add(throttleSecs * time.Second).After(time.Now()) {
-				throttleTimer = time.After(
-					time.Until(
-						lastTriggerTime.Add(throttleSecs * time.Second),
-					),
-				)
-				logger.Infow("Throttelling!")
-				run = false
-				continue
-			}
+			/*			if lastTriggerTime.Add(throttleSecs * time.Second).After(time.Now()) {
+						throttleTimer = time.After(
+							time.Until(
+								lastTriggerTime.Add(throttleSecs * time.Second),
+							),
+						)
+						logger.Infow("Throttelling!")
+						run = false
+						continue
+					}*/
 
 			// Update eBPF maps for kernel logic
 			err = derive.FillModulesFromProcFs()
@@ -100,7 +100,7 @@ func (t *Tracee) lkmSeekerRoutine(ctx gocontext.Context) {
 			}
 
 			// Prepare throttle timer
-			lastTriggerTime = time.Now()
+			/*			lastTriggerTime = time.Now()*/
 
 			logger.Infow("triggering logic now!")
 			// Run kernel logic
@@ -122,13 +122,13 @@ func (t *Tracee) lkmSeekerRoutine(ctx gocontext.Context) {
 				return
 
 			case <-time.After(utils.GenerateRandomDuration(10, 300)):
-				logger.Infow("woke up from sleep.. suppose to ru now")
+				logger.Infow("woke up from sleep.. suppose to run now")
 				run = true // Run from time to time.
 
-			case <-throttleTimer:
-				logger.Infow("throttle timer over.. suppose to run now")
-				throttleTimer = nil // Cool-down period ended...
-				run = true          // ...run now!
+				/*			case <-throttleTimer:
+							logger.Infow("throttle timer over.. suppose to run now")
+							throttleTimer = nil // Cool-down period ended...
+							run = true          // ...run now!*/
 
 			case scanReq := <-wakeupChan:
 				if scanReq.Flags&derive.FullScan != 0 {
