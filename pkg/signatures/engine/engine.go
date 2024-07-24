@@ -176,7 +176,6 @@ func (engine *Engine) processEvent(event protocol.Event) {
 	for _, s := range engine.signaturesIndex[signatureSelector] {
 		engine.dispatchEvent(s, event)
 	}
-
 	// Match partial selector, select for all origins
 	partialSigEvtSelector := detect.SignatureEventSelector{
 		Source: signatureSelector.Source,
@@ -259,12 +258,12 @@ drain:
 }
 
 func (engine *Engine) dispatchEvent(s detect.Signature, event protocol.Event) {
-	if engine.config.Enabled {
-		// Do this test only if engine runs as part of the event pipeline
-		if ok := engine.filterDispatchInPipeline(s, event); !ok {
-			return
-		}
-	}
+	//if engine.config.Enabled {
+	//	// Do this test only if engine runs as part of the event pipeline
+	//	if ok := engine.filterDispatchInPipeline(s, event); !ok {
+	//		return
+	//	}
+	//}
 
 	engine.signatures[s] <- event
 }
