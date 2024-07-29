@@ -127,6 +127,12 @@ enum event_id_e
     MODULE_FREE,
     EXECUTE_FINISHED,
     SECURITY_BPRM_CREDS_FOR_EXEC,
+<<<<<<< HEAD
+=======
+    SECURITY_TASK_SETRLIMIT,
+    SECURITY_SETTIME64,
+    SCHED_PROCESS_EXEC_SOCKET,
+>>>>>>> 1fb03b7d4 (feat(ebpf): add stdin_info to sched_process_exec)
     MAX_EVENT_ID,
     NO_EVENT_SUBMIT,
 };
