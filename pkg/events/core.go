@@ -11608,15 +11608,10 @@ var CoreEvents = map[ID]Definition{
 		dependencies: Dependencies{
 			probes: []Probe{
 				{handle: probes.SecuritySocketConnect, required: true},
-				{handle: probes.SyscallEnter__Internal, required: true},
-			},
-			tailCalls: []TailCall{
-				{"sys_enter_init_tail", "sys_enter_init", []uint32{uint32(Connect)}},
 			},
 		},
 		sets: []string{"default", "lsm_hooks", "net", "net_sock"},
 		params: []trace.ArgMeta{
-			{Type: "int", Name: "sockfd"},
 			{Type: "int", Name: "type"},
 			{Type: "struct sockaddr*", Name: "remote_addr"},
 		},

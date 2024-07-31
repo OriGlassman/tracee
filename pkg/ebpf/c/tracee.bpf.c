@@ -2608,33 +2608,12 @@ int BPF_KPROBE(trace_security_socket_connect)
             return 0;
     }
 
-    // Load args given to the syscall that invoked this function.
-    syscall_data_t *sys = &p.task_info->syscall_data;
-    if (!p.task_info->syscall_traced)
-        return 0;
-
     // Reduce line cols by having a few temp pointers.
     int (*stsb)(args_buffer_t *, void *, u32, u8) = save_to_submit_buf;
     void *args_buf = &p.event->args_buf;
-    void *to = (void *) &sys->args.args[0];
-
-    if (is_x86_compat(p.event->task)) // only i386 binaries uses socketcall
-        to = (void *) sys->args.args[1];
-
-    // Save the socket fd, depending on the syscall.
-    switch (sys->id) {
-        case SYSCALL_CONNECT:
-        case SYSCALL_SOCKETCALL:
-            break;
-        default:
-            return 0;
-    }
-
-    // Save the socket fd argument to the event.
-    stsb(args_buf, to, sizeof(u32), 0);
 
     // Save the socket type argument to the event.
-    stsb(args_buf, &type, sizeof(u32), 1);
+    stsb(args_buf, &type, sizeof(u32), 0);
 
     bool need_workaround = false;
 
@@ -2661,13 +2640,13 @@ int BPF_KPROBE(trace_security_socket_connect)
         struct sockaddr_un sockaddr = {0};
         bpf_probe_read(&sockaddr, (u32) addr_len, (void *) address);
         // NOTE(nadav.str): stack allocated, so runtime core size check is avoided
-        stsb(args_buf, (void *) &sockaddr, sizeof(struct sockaddr_un), 2);
+        stsb(args_buf, (void *) &sockaddr, sizeof(struct sockaddr_un), 1);
     }
 #endif
 
     // Save the sockaddr struct argument to the event.
     if (!need_workaround)
-        stsb(args_buf, (void *) address, sockaddr_len, 2);
+        stsb(args_buf, (void *) address, sockaddr_len, 1);
 
     // Submit the event.
     return events_perf_submit(&p, 0);
