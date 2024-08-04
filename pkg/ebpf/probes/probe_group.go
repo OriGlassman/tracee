@@ -232,6 +232,10 @@ func NewDefaultProbeGroup(module *bpf.Module, netEnabled bool) (*ProbeGroup, err
 		PtraceCompatX86:            NewTraceProbe(KProbe, "__ia32_compat_sys_ptrace", "trace_ptrace"),
 		PtraceARM:                  NewTraceProbe(KProbe, "__arm64_sys_ptrace", "trace_ptrace"),
 		PtraceCompatARM:            NewTraceProbe(KProbe, "__arm64_compat_sys_ptrace", "trace_ptrace"),
+		ProcessVmWritevX86:         NewTraceProbe(KProbe, "__x64_sys_process_vm_writev", "trace_process_vm_writev"),
+		ProcessVmWritevCompatX86:   NewTraceProbe(KProbe, "__ia32_compat_sys_process_vm_writev", "trace_process_vm_writev"),
+		ProcessVmWritevARM:         NewTraceProbe(KProbe, "__arm64_sys_process_vm_writev", "trace_process_vm_writev"),
+		ProcessVmWritevCompatARM:   NewTraceProbe(KProbe, "__arm64_compat_sys_process_vm_writev", "trace_process_vm_writev"),
 
 		TestUnavailableHook: NewTraceProbe(KProbe, "non_existing_func", "empty_kprobe"),
 		ExecTest:            NewTraceProbe(RawTracepoint, "raw_syscalls:sched_process_exec", "tracepoint__exec_test"),

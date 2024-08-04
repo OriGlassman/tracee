@@ -158,6 +158,10 @@ const (
 	PtraceCompatX86
 	PtraceARM
 	PtraceCompatARM
+	ProcessVmWritevX86
+	ProcessVmWritevCompatX86
+	ProcessVmWritevARM
+	ProcessVmWritevCompatARM
 )
 
 // Test probe handles

@@ -115,6 +115,7 @@ const (
 	SecuritySettime64
 	ArchPrctlNoSysEnter
 	PtraceSyscallNoSysenter
+	ProcessVmWritevNoSysenter
 	MaxCommonID
 )
 
@@ -7760,34 +7761,6 @@ var CoreEvents = map[ID]Definition{
 			},
 		},
 	},
-	ProcessVmWritev: {
-		id:      ProcessVmWritev,
-		id32Bit: Sys32process_vm_writev,
-		name:    "process_vm_writev",
-		version: NewVersion(1, 0, 0),
-		syscall: true,
-		sets:    []string{"default", "syscalls", "proc"},
-		params: []trace.ArgMeta{
-			{Type: "pid_t", Name: "pid"},
-			{Type: "const struct iovec*", Name: "local_iov"},
-			{Type: "unsigned long", Name: "liovcnt"},
-			{Type: "const struct iovec*", Name: "remote_iov"},
-			{Type: "unsigned long", Name: "riovcnt"},
-			{Type: "unsigned long", Name: "flags"},
-		},
-		dependencies: Dependencies{
-			probes: []Probe{
-				{handle: probes.SyscallEnter__Internal, required: true},
-				{handle: probes.SyscallExit__Internal, required: true},
-			},
-			tailCalls: []TailCall{
-				{"sys_enter_init_tail", "sys_enter_init", []uint32{uint32(ProcessVmWritev)}},
-				{"sys_enter_submit_tail", "sys_enter_submit", []uint32{uint32(ProcessVmWritev)}},
-				{"sys_exit_init_tail", "sys_exit_init", []uint32{uint32(ProcessVmWritev)}},
-				{"sys_exit_submit_tail", "sys_exit_submit", []uint32{uint32(ProcessVmWritev)}},
-			},
-		},
-	},
 	Kcmp: {
 		id:      Kcmp,
 		id32Bit: Sys32kcmp,
@@ -13097,6 +13070,30 @@ var CoreEvents = map[ID]Definition{
 				{handle: probes.PtraceCompatX86, required: false},
 				{handle: probes.PtraceARM, required: false},
 				{handle: probes.PtraceCompatARM, required: false},
+			},
+		},
+	},
+	ProcessVmWritevNoSysenter: {
+		id:      ProcessVmWritevNoSysenter,
+		id32Bit: Sys32process_vm_writev,
+		name:    "process_vm_writev",
+		version: NewVersion(1, 0, 0),
+		syscall: true,
+		sets:    []string{"default", "syscalls", "proc"},
+		params: []trace.ArgMeta{
+			{Type: "pid_t", Name: "pid"},
+			{Type: "const struct iovec*", Name: "local_iov"},
+			{Type: "unsigned long", Name: "liovcnt"},
+			{Type: "const struct iovec*", Name: "remote_iov"},
+			{Type: "unsigned long", Name: "riovcnt"},
+			{Type: "unsigned long", Name: "flags"},
+		},
+		dependencies: Dependencies{
+			probes: []Probe{
+				{handle: probes.ProcessVmWritevX86, required: false},
+				{handle: probes.ProcessVmWritevCompatX86, required: false},
+				{handle: probes.ProcessVmWritevARM, required: false},
+				{handle: probes.ProcessVmWritevCompatARM, required: false},
 			},
 		},
 	},
