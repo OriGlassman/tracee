@@ -228,6 +228,10 @@ func NewDefaultProbeGroup(module *bpf.Module, netEnabled bool) (*ProbeGroup, err
 		ArchPrctlCompatX86:         NewTraceProbe(KretProbe, "__ia32_compat_sys_arch_prctl", "trace_arch_prctl"),
 		ArchPrctlARM:               NewTraceProbe(KretProbe, "__arm64_sys_arch_prctl", "trace_arch_prctl"),
 		ArchPrctlCompatARM:         NewTraceProbe(KretProbe, "__arm64_sys_arch_prctl", "trace_arch_prctl"),
+		PtraceX86:                  NewTraceProbe(KProbe, "__x64_sys_ptrace", "trace_ptrace"),
+		PtraceCompatX86:            NewTraceProbe(KProbe, "__ia32_compat_sys_ptrace", "trace_ptrace"),
+		PtraceARM:                  NewTraceProbe(KProbe, "__arm64_sys_ptrace", "trace_ptrace"),
+		PtraceCompatARM:            NewTraceProbe(KProbe, "__arm64_compat_sys_ptrace", "trace_ptrace"),
 
 		TestUnavailableHook: NewTraceProbe(KProbe, "non_existing_func", "empty_kprobe"),
 		ExecTest:            NewTraceProbe(RawTracepoint, "raw_syscalls:sched_process_exec", "tracepoint__exec_test"),

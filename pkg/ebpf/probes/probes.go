@@ -154,6 +154,10 @@ const (
 	ArchPrctlCompatX86
 	ArchPrctlARM
 	ArchPrctlCompatARM
+	PtraceX86
+	PtraceCompatX86
+	PtraceARM
+	PtraceCompatARM
 )
 
 // Test probe handles
