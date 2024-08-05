@@ -113,6 +113,7 @@ const (
 	SecurityBprmCredsForExec
 	SecurityTaskSetrlimit
 	SecuritySettime64
+	DoArchPrctl64
 	MaxCommonID
 )
 
@@ -13104,6 +13105,21 @@ var CoreEvents = map[ID]Definition{
 			{Type: "u64", Name: "tv_nsec"},
 			{Type: "int", Name: "tz_minuteswest"},
 			{Type: "int", Name: "tz_dsttime"},
+		},
+	},
+	DoArchPrctl64: {
+		id:      DoArchPrctl64,
+		id32Bit: Sys32Undefined,
+		name:    "do_arch_prctl_64",
+		dependencies: Dependencies{
+			probes: []Probe{
+				{handle: probes.DoArchPrctl64, required: true},
+			},
+		},
+		sets: []string{},
+		params: []trace.ArgMeta{
+			{Type: "int", Name: "option"},
+			{Type: "unsigned long", Name: "addr"},
 		},
 	},
 	//

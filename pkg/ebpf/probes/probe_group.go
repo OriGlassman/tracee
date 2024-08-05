@@ -224,6 +224,7 @@ func NewDefaultProbeGroup(module *bpf.Module, netEnabled bool) (*ProbeGroup, err
 		ExecuteAtFinishedCompatARM: NewTraceProbe(KretProbe, "__arm64_compat_sys_execveat", "trace_execute_finished"),
 		SecurityTaskSetrlimit:      NewTraceProbe(KProbe, "security_task_setrlimit", "trace_security_task_setrlimit"),
 		SecuritySettime64:          NewTraceProbe(KProbe, "security_settime64", "trace_security_settime64"),
+		DoArchPrctl64:              NewTraceProbe(KProbe, "do_arch_prctl_common", "trace_do_arch_prctl_64"),
 
 		TestUnavailableHook: NewTraceProbe(KProbe, "non_existing_func", "empty_kprobe"),
 		ExecTest:            NewTraceProbe(RawTracepoint, "raw_syscalls:sched_process_exec", "tracepoint__exec_test"),

@@ -5160,6 +5160,24 @@ int BPF_KPROBE(trace_security_settime64)
     return events_perf_submit(&p, 0);
 }
 
+SEC("kprobe/do_arch_prctl_common")
+int BPF_KPROBE(trace_do_arch_prctl_64)
+{
+    program_data_t p = {};
+    if (!init_program_data(&p, ctx, DO_ARCH_PRCTL_64))
+        return 0;
+
+    if (!evaluate_scope_filters(&p))
+        return 0;
+
+    int option = PT_REGS_PARM1(ctx);
+    unsigned long addr = PT_REGS_PARM2(ctx);
+
+    save_to_submit_buf(&p.event->args_buf, &option, sizeof(option), 0);
+    save_to_submit_buf(&p.event->args_buf, &addr, sizeof(addr), 1);
+    return events_perf_submit(&p, 0);
+}
+
 // clang-format off
 
 // Network Packets (works from ~5.2 and beyond)

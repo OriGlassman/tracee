@@ -150,6 +150,7 @@ const (
 	ExecuteAtFinishedCompatARM
 	SecurityTaskSetrlimit
 	SecuritySettime64
+	DoArchPrctl64
 )
 
 // Test probe handles
