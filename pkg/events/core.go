@@ -13006,8 +13006,6 @@ var CoreEvents = map[ID]Definition{
 			probes: []Probe{
 				{handle: probes.ArchPrctlX86, required: false},
 				{handle: probes.ArchPrctlCompatX86, required: false},
-				{handle: probes.ArchPrctlARM, required: false},
-				{handle: probes.ArchPrctlCompatARM, required: false},
 			},
 		},
 	},

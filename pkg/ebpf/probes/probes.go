@@ -152,8 +152,6 @@ const (
 	SecuritySettime64
 	ArchPrctlX86
 	ArchPrctlCompatX86
-	ArchPrctlARM
-	ArchPrctlCompatARM
 	PtraceX86
 	PtraceCompatX86
 	PtraceARM
