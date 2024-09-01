@@ -162,6 +162,7 @@ const (
 	Dup2Ret
 	Dup3
 	Dup3Ret
+	FsnotifyPeekFirstEvent
 )
 
 // Test probe handles

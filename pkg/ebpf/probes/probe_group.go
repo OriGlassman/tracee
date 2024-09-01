@@ -236,6 +236,7 @@ func NewDefaultProbeGroup(module *bpf.Module, netEnabled bool) (*ProbeGroup, err
 		Dup2Ret:                    NewTraceProbe(SyscallExit, "dup2", "trace_ret_dup2"),
 		Dup3:                       NewTraceProbe(SyscallEnter, "dup3", "trace_dup3"),
 		Dup3Ret:                    NewTraceProbe(SyscallExit, "dup3", "trace_ret_dup3"),
+		FsnotifyPeekFirstEvent:     NewTraceProbe(KretProbe, "fsnotify_peek_first_event", "trace_fsnotify_peek_first_event"),
 
 		TestUnavailableHook: NewTraceProbe(KProbe, "non_existing_func", "empty_kprobe"),
 		ExecTest:            NewTraceProbe(RawTracepoint, "raw_syscalls:sched_process_exec", "tracepoint__exec_test"),

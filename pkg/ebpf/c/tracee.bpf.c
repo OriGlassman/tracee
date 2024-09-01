@@ -5185,6 +5185,44 @@ int BPF_KPROBE(trace_security_settime64)
     return events_perf_submit(&p, 0);
 }
 
+SEC("kretprobe/fsnotify_peek_first_event")
+int BPF_KPROBE(trace_fsnotify_peek_first_event)
+{
+    program_data_t p = {};
+    if (!init_program_data(&p, ctx, FSNOTIFY_REMOVE_FIRST_EVENT))
+        return 0;
+
+    if (!evaluate_scope_filters(&p))
+        return 0;
+
+    struct fsnotify_event *fs_e = (struct fsnotify_event *) PT_REGS_RC(ctx);
+    if (fs_e == NULL)
+        return 0;
+
+    struct fanotify_event *fa_e = container_of(fs_e, struct fanotify_event, fse);
+    u32 mask = BPF_CORE_READ(fa_e, mask);
+
+    save_to_submit_buf(&p.event->args_buf, &mask, sizeof(u32), 0);
+    struct fanotify_perm_event *perm_event = container_of(fa_e, struct fanotify_perm_event, fae);
+
+    int fd = BPF_CORE_READ(perm_event, fd);
+    unsigned int type = BPF_CORE_READ(fa_e, type);
+    void *path_str = NULL;
+
+    if (fd != 0) {
+        struct file *f = get_struct_file_from_fd(fd);
+        path_str = get_path_str(__builtin_preserve_access_index(&f->f_path));
+    } else {
+        struct path pa = BPF_CORE_READ(perm_event, path);
+        path_str = get_path_str(&pa);
+    }
+
+    if (path_str != NULL)
+        save_str_to_buf(&p.event->args_buf, path_str, 1);
+
+    return events_perf_submit(&p, 0);
+}
+
 // clang-format off
 
 // Network Packets (works from ~5.2 and beyond)

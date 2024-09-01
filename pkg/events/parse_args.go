@@ -226,6 +226,13 @@ func ParseArgs(event *trace.Event) error {
 				parseFsNotifyObjType(objTypeArg, uint64(objType))
 			}
 		}
+	case FsnotifyPeekFirstEvent:
+		if maskArg := GetArg(event, "mask"); maskArg != nil {
+			if mask, isUint32 := maskArg.Value.(uint32); isUint32 {
+				maskArg.Type = "string"
+				maskArg.Value = parsers.ParseFsNotifyMask(uint64(mask)).String()
+			}
+		}
 	}
 
 	return nil

@@ -436,6 +436,17 @@ struct file_operations {
     long (*write_iter)(struct kiocb *, struct iov_iter *);
 };
 
+enum fanotify_event_type
+{
+    FANOTIFY_EVENT_TYPE_FID,      /* fixed length */
+    FANOTIFY_EVENT_TYPE_FID_NAME, /* variable length */
+    FANOTIFY_EVENT_TYPE_PATH,
+    FANOTIFY_EVENT_TYPE_PATH_PERM,
+    FANOTIFY_EVENT_TYPE_OVERFLOW, /* struct fanotify_event */
+    FANOTIFY_EVENT_TYPE_FS_ERROR, /* struct fanotify_error_event */
+    __FANOTIFY_EVENT_TYPE_NUM
+};
+
 struct file {
     union {
         unsigned int f_iocb_flags;
@@ -445,6 +456,29 @@ struct file {
     const struct file_operations *f_op;
     unsigned int f_flags;
     void *private_data;
+};
+
+struct fsnotify_event {
+    struct list_head list;
+};
+
+struct fanotify_event {
+    struct fsnotify_event fse;
+    u32 mask;
+    struct {
+        unsigned int type;
+    };
+};
+
+struct fanotify_perm_event {
+    struct fanotify_event fae;
+    struct path path;
+    int fd;
+};
+
+struct fanotify_path_event {
+    struct fanotify_event fae;
+    struct path path;
 };
 
 struct pipe_inode_info {

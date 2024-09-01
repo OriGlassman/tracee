@@ -113,6 +113,7 @@ const (
 	SecurityBprmCredsForExec
 	SecurityTaskSetrlimit
 	SecuritySettime64
+	FsnotifyPeekFirstEvent
 	MaxCommonID
 )
 
@@ -13027,6 +13028,21 @@ var CoreEvents = map[ID]Definition{
 			{Type: "u64", Name: "tv_nsec"},
 			{Type: "int", Name: "tz_minuteswest"},
 			{Type: "int", Name: "tz_dsttime"},
+		},
+	},
+	FsnotifyPeekFirstEvent: {
+		id:      FsnotifyPeekFirstEvent,
+		id32Bit: Sys32Undefined,
+		name:    "fsnotify_peek_first_event",
+		dependencies: Dependencies{
+			probes: []Probe{
+				{handle: probes.FsnotifyPeekFirstEvent, required: true},
+			},
+		},
+		sets: []string{},
+		params: []trace.ArgMeta{
+			{Type: "u32", Name: "mask"},
+			{Type: "const char*", Name: "path"},
 		},
 	},
 	//
