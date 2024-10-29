@@ -95,15 +95,6 @@ func (stats *Stats) RegisterPrometheus() error {
 		return errfmt.WrapError(err)
 	}
 
-	stats.CounterVecEbpf = prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Namespace: "tracee_ebpf",
-			Name:      "sent_from_ebpf",
-		},
-		[]string{"key"},
-	)
-	err = prometheus.Register(stats.CounterVecEbpf)
-
 	if err != nil {
 		return errfmt.WrapError(err)
 	}

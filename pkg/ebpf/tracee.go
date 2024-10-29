@@ -1513,6 +1513,19 @@ func updateCounterVecFromMap(data map[int]uint64, counterVec *prometheus.Counter
 }
 
 func (t *Tracee) ori() {
+	t.stats.CounterVecEbpf = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "tracee_ebpf",
+			Name:      "sent_from_ebpf",
+		},
+		[]string{"key"},
+	)
+	err := prometheus.Register(t.stats.CounterVecEbpf)
+	if err != nil {
+		logger.Errorw("Error occurred prom register: " + err.Error())
+		return
+	}
+
 	oriMap, err := t.bpfModule.GetMap("ori")
 	if err != nil {
 		logger.Errorw("Error occurred GetMap: " + err.Error())

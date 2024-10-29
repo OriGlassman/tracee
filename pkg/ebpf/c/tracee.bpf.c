@@ -906,7 +906,7 @@ statfunc int find_modules_from_module_kset_list(program_data_t *p)
                 }
                 int ret = is_hidden((u64) mod);
                 if (ret == MOD_HIDDEN) {
-                    lkm_seeker_send_to_userspace(mod, &flags, p);
+                    //lkm_seeker_send_to_userspace(mod, &flags, p);
                 } else if (ret == HID_MOD_RACE_CONDITION) {
                     return ret;
                 }
@@ -958,7 +958,7 @@ statfunc int walk_mod_tree(program_data_t *p, struct rb_node *root, int idx)
 
                 int ret = is_hidden((u64) mod);
                 if (ret == MOD_HIDDEN) {
-                    lkm_seeker_send_to_userspace(mod, &flags, p);
+                    //lkm_seeker_send_to_userspace(mod, &flags, p);
                 } else if (ret == HID_MOD_RACE_CONDITION) {
                     return ret;
                 }
@@ -1071,7 +1071,7 @@ statfunc int check_is_proc_modules_hooked(program_data_t *p)
             }
 
             // Module was not seen in proc modules and there was no recent insertion, report.
-            lkm_seeker_send_to_userspace(pos, &flags, p);
+            //lkm_seeker_send_to_userspace(pos, &flags, p);
         }
     }
 
@@ -1131,7 +1131,7 @@ int uprobe_lkm_seeker_submitter(struct pt_regs *ctx)
     u32 flags =
         ((u32) received_flags) | HIDDEN_MODULE; // Convert to 32bit and turn on the bit that will
                                                 // cause it to be sent as an event to the user
-    lkm_seeker_send_to_userspace((struct module *) mod_address, &flags, &p);
+    //lkm_seeker_send_to_userspace((struct module *) mod_address, &flags, &p);
 
     return 0;
 }
@@ -1195,8 +1195,8 @@ int lkm_seeker_kset_tail(struct pt_regs *ctx)
     if (ret < 0) {
         tracee_log(ctx, BPF_LOG_LVL_WARN, BPF_LOG_ID_HID_KER_MOD, ret);
         u32 flags = HISTORY_SCAN_FINISHED;
-        lkm_seeker_send_to_userspace(
-            (struct module *) HISTORY_SCAN_FAILURE, &flags, &p); // Report failure of history scan
+        // lkm_seeker_send_to_userspace(
+        //     (struct module *) HISTORY_SCAN_FAILURE, &flags, &p); // Report failure of history scan
         return -1;
     }
 
@@ -1224,13 +1224,13 @@ int lkm_seeker_mod_tree_tail(struct pt_regs *ctx)
     int ret = find_modules_from_mod_tree(&p);
     if (ret < 0) {
         tracee_log(ctx, BPF_LOG_LVL_WARN, BPF_LOG_ID_HID_KER_MOD, ret);
-        lkm_seeker_send_to_userspace(
-            (struct module *) HISTORY_SCAN_FAILURE, &flags, &p); // Report failure of history scan
+        // lkm_seeker_send_to_userspace(
+        //     (struct module *) HISTORY_SCAN_FAILURE, &flags, &p); // Report failure of history scan
         return -1;
     }
 
     // Report to userspace that the history scan finished successfully
-    lkm_seeker_send_to_userspace((struct module *) HISTORY_SCAN_SUCCESSFUL, &flags, &p);
+    //lkm_seeker_send_to_userspace((struct module *) HISTORY_SCAN_SUCCESSFUL, &flags, &p);
 
     bpf_tail_call(ctx, &prog_array, TAIL_HIDDEN_KERNEL_MODULE_PROC);
 
@@ -1280,10 +1280,10 @@ int lkm_seeker_new_mod_only_tail(struct pt_regs *ctx)
         return -1;
     }
 
-    struct module *mod =
-        (struct module *) start_scan_time; // Use the module address field as the start_scan_time
-    u32 flags = NEW_MOD;
-    lkm_seeker_send_to_userspace(mod, &flags, &p);
+    // struct module *mod =
+    //     (struct module *) start_scan_time; // Use the module address field as the start_scan_time
+    // u32 flags = NEW_MOD;
+    // lkm_seeker_send_to_userspace(mod, &flags, &p);
 
     return 0;
 }
@@ -4401,7 +4401,7 @@ int BPF_KPROBE(trace_ret_do_init_module)
     if (evaluate_scope_filters(&p)) {
         u64 addr = (u64) mod;
         u32 flags = FULL_SCAN;
-        lkm_seeker_send_to_userspace((struct module *) addr, &flags, &p);
+        //lkm_seeker_send_to_userspace((struct module *) addr, &flags, &p);
     }
 
     // save strings to buf
