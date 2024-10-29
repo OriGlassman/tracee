@@ -633,6 +633,13 @@ struct events {
     __type(value, u32);
 } events SEC(".maps");
 
+struct ori {
+    __uint(type, BPF_MAP_TYPE_ARRAY);
+    __uint(max_entries, 3000);
+    __type(key, u32);
+    __type(value, u64);
+} ori SEC(".maps");
+
 typedef struct events events_t;
 
 // file writes events submission

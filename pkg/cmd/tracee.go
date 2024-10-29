@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"github.com/prometheus/client_golang/prometheus"
 	"os"
 	"strconv"
 	"syscall"
@@ -39,6 +40,7 @@ func (r Runner) Run(ctx context.Context) error {
 			if r.HTTPServer != nil {
 				if r.HTTPServer.MetricsEndpointEnabled() {
 					r.TraceeConfig.MetricsEnabled = true // TODO: is this needed ?
+
 					if err := t.Stats().RegisterPrometheus(); err != nil {
 						logger.Errorw("Registering prometheus metrics", "error", err)
 					}
@@ -97,10 +99,23 @@ func (r Runner) Run(ctx context.Context) error {
 
 	// Start event channel reception
 
+	t.Stats().CounterVecUserspace = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "tracee_ebpf",
+			Name:      "sent_from_userspace",
+		},
+		[]string{"key"},
+	)
+	err = prometheus.Register(t.Stats().CounterVecUserspace)
+	if err != nil {
+		return errfmt.WrapError(err)
+	}
+
 	go func() {
 		for {
 			select {
 			case event := <-stream.ReceiveEvents():
+				t.Stats().CounterVecUserspace.WithLabelValues(strconv.Itoa(event.EventID)).Add(float64(1))
 				r.Printer.Print(event)
 			case <-ctx.Done():
 				return

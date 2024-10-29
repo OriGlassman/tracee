@@ -5,12 +5,14 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/prometheus/client_golang/prometheus"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"syscall"
+	"time"
 	"unsafe"
 
 	"kernel.org/pub/linux/libs/security/libcap/cap"
@@ -1492,11 +1494,65 @@ func (t *Tracee) initBPF() error {
 
 const pollTimeout int = 300
 
+// updateCounterVecFromMap updates the CounterVec with values from a map[int]int
+func updateCounterVecFromMap(data map[int]uint64, counterVec *prometheus.CounterVec, lastReported map[int]int) {
+	for k, v := range data {
+		lastValue, found := lastReported[k]
+		if found {
+			increment := v - uint64(lastValue)
+			if increment > 0 {
+				counterVec.WithLabelValues(strconv.Itoa(k)).Add(float64(increment))
+			}
+		} else {
+			// If first time encountering this key, add the whole value
+			counterVec.WithLabelValues(strconv.Itoa(k)).Add(float64(v))
+		}
+		// Update the last reported value
+		lastReported[k] = int(v)
+	}
+}
+
+func (t *Tracee) ori() {
+	oriMap, err := t.bpfModule.GetMap("ori")
+	if err != nil {
+		logger.Errorw("Error occurred GetMap: " + err.Error())
+		return
+	}
+	lastReported := make(map[int]int)
+
+	for {
+		dataMap := map[int]uint64{}
+		capabilities.GetInstance().EBPF(
+			func() error {
+				for i := 0; i < 3000; i++ {
+					curVal, err := oriMap.GetValue(unsafe.Pointer(&i))
+					if err != nil {
+						return err
+					}
+					val := binary.LittleEndian.Uint64(curVal)
+					if val != 0 {
+						dataMap[i] = val
+					}
+				}
+
+				return nil
+			},
+		)
+
+		updateCounterVecFromMap(dataMap, t.stats.CounterVecEbpf, lastReported)
+
+		time.Sleep(2 * time.Second)
+	}
+
+}
+
 // Run starts the trace. it will run until ctx is cancelled
 func (t *Tracee) Run(ctx gocontext.Context) error {
 	// Some events need initialization before the perf buffers are polled
 
 	go t.hookedSyscallTableRoutine(ctx)
+
+	go t.ori()
 
 	t.triggerSeqOpsIntegrityCheck(trace.Event{})
 	errs := t.triggerMemDump(trace.Event{})

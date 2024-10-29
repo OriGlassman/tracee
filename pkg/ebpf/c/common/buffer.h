@@ -484,6 +484,11 @@ statfunc int events_perf_submit(program_data_t *p, long ret)
                  :
                  : [size] "r"(size), [max_size] "i"(MAX_EVENT_SIZE));
 
+    u64 *value = bpf_map_lookup_elem(&ori, &p->event->context.eventid);
+    if (value) {
+        __sync_fetch_and_add(value, 1);
+    }
+
     return bpf_perf_event_output(p->ctx, &events, BPF_F_CURRENT_CPU, p->event, size);
 }
 

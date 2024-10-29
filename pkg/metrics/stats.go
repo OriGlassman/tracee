@@ -18,6 +18,9 @@ type Stats struct {
 	LostWrCount      counter.Counter
 	LostNtCapCount   counter.Counter // lost network capture events
 	LostBPFLogsCount counter.Counter
+
+	CounterVecEbpf      *prometheus.CounterVec
+	CounterVecUserspace *prometheus.CounterVec
 }
 
 // Register Stats to prometheus metrics exporter
@@ -87,6 +90,19 @@ func (stats *Stats) RegisterPrometheus() error {
 		Name:      "bpf_logs_total",
 		Help:      "logs collected by tracee-ebpf during ebpf execution",
 	}, func() float64 { return float64(stats.BPFLogsCount.Get()) }))
+
+	if err != nil {
+		return errfmt.WrapError(err)
+	}
+
+	stats.CounterVecEbpf = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "tracee_ebpf",
+			Name:      "sent_from_ebpf",
+		},
+		[]string{"key"},
+	)
+	err = prometheus.Register(stats.CounterVecEbpf)
 
 	if err != nil {
 		return errfmt.WrapError(err)
