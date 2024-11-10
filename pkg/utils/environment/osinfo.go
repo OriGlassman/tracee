@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/shirou/gopsutil/v4/cpu"
 	"os"
 	"strings"
 )
@@ -295,4 +296,9 @@ func Lockdown() (LockdownMode, error) {
 	}
 
 	return NOVALUE, fmt.Errorf("could not get lockdown mode")
+}
+
+func GetNumCpu()
+func a() {
+	cpu.Info()
 }

@@ -1670,6 +1670,17 @@ func (t *Tracee) invokeInitEvents(out chan *trace.Event) {
 
 		go events.FtraceHookEvent(t.stats.EventCount, out, ftraceBaseEvent, selfLoadedFtraceProgs)
 	}
+
+	// System info event
+
+	matchedPolicies = policiesMatch(events.SystemInfo)
+	if matchedPolicies > 0 {
+		systemInfoEvent := events.SystemInfoEvent(t.config.OSInfo)
+		setMatchedPolicies(&systemInfoEvent, matchedPolicies)
+		out <- &systemInfoEvent
+		_ = t.stats.EventCount.Increment()
+	}
+
 }
 
 // netEnabled returns true if any base network event is to be traced

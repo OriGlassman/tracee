@@ -16,6 +16,7 @@
 package events
 
 import (
+	"github.com/aquasecurity/tracee/pkg/utils/environment"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -153,4 +154,60 @@ func ExistingContainersEvents(cts *containers.Containers, enrichDisabled bool) [
 	}
 
 	return events
+}
+
+// SystemInfoEvent collect information of the system and create an event from them
+func SystemInfoEvent(osInfo *environment.OSInfo) trace.Event {
+	systemInfoDef := Core.GetDefinitionByID(SystemInfo)
+	systemInfoArgs := getSystemInfoArguments(osInfo)
+
+	SystemInfoEvent := trace.Event{
+		Timestamp:   int(time.Now().UnixNano()),
+		ProcessName: "tracee-ebpf",
+		EventID:     int(SystemInfo),
+		EventName:   systemInfoDef.GetName(),
+		ArgsNum:     len(systemInfoArgs),
+		Args:        systemInfoArgs,
+	}
+
+	return SystemInfoEvent
+}
+
+func getSystemInfoArguments(osInfo *environment.OSInfo) []trace.Argument {
+	logger.Infow("a", "a", osInfo.GetOSReleaseAllFieldValues(), "b", osInfo.GetOSReleaseID())
+	numRunningProcess :=nil
+	uptime := nil
+	localTimeZone :=
+	//distro := osInfo.GetOSReleaseID().String()
+	//distroVersion := osInfo.GetOSReleaseFieldValue(environment.OS_VERSION_ID)
+	//hasBtf := environment.OSBTFEnabled()
+	//arch := osInfo.GetOSReleaseFieldValue(environment.OS_ARCH)
+	//kernelVersion := osInfo.GetOSReleaseFieldValue(environment.OS_KERNEL_RELEASE)
+	//
+	//lockdown := ""
+	//lockdownMode, err := environment.Lockdown()
+	//if err == nil {
+	//	lockdown = lockdownMode.String()
+	//}
+	//
+	//ftraceEnabled := ""
+	//ftraceEnabledVal, err := environment.FtraceEnabled()
+	//if err == nil {
+	//	ftraceEnabled = strconv.FormatBool(ftraceEnabledVal)
+	//}
+	//
+	//eventDefinition := Core.GetDefinitionByID(SystemInfo)
+	//systemInfoArgs := make([]trace.Argument, len(eventDefinition.GetParams()))
+	//
+	//params := eventDefinition.GetParams()
+	//
+	//for i, arg := range initNamespacesArgs {
+	//	arg.ArgMeta = params[i]
+	//	arg.Value = initNamespaces[arg.Name]
+	//	initNamespacesArgs[i] = arg
+	//}
+	//
+	//return initNamespacesArgs
+
+	return nil
 }

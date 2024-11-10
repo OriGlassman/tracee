@@ -114,6 +114,7 @@ const (
 	SecurityTaskSetrlimit
 	SecuritySettime64
 	ChmodCommon
+	SystemInfo
 	MaxCommonID
 )
 
@@ -13059,6 +13060,18 @@ var CoreEvents = map[ID]Definition{
 				{handle: probes.ChmodCommon, required: true},
 			},
 		},
+	},
+	SystemInfo: {
+		id:      SystemInfo,
+		id32Bit: Sys32Undefined,
+		name:    "system_info",
+		version: NewVersion(1, 0, 0),
+		syscall: true,
+		sets:    []string{},
+		params: []trace.ArgMeta{
+			{Type: "const char*", Name: "pathname"},
+		},
+		dependencies: Dependencies{},
 	},
 	//
 	// Begin of Signal Events (Control Plane)
