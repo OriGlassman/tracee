@@ -230,6 +230,7 @@ func (f *DataFilter) parseFilter(fieldName string, operatorAndValues string, fil
 }
 
 func (f *DataFilter) processKernelFilter(val, fieldName string) (string, error) {
+	logger.Infow("a", "a", fieldName)
 	// Check for kernel filter restrictions
 	if err := f.checkKernelFilterRestrictions(val); err != nil {
 		return val, err

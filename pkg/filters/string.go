@@ -1,6 +1,7 @@
 package filters
 
 import (
+	"github.com/aquasecurity/tracee/pkg/logger"
 	"strings"
 
 	"golang.org/x/exp/maps"
@@ -117,7 +118,7 @@ func (f *StringFilter) Parse(operatorAndValues string) error {
 	}
 
 	values := strings.Split(valuesString, ",")
-
+	logger.Infow("b", "b", values)
 	var (
 		val string
 		err error

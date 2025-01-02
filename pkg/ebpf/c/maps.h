@@ -418,6 +418,28 @@ typedef struct elf_files_map elf_files_map_t;
 // versioned maps (map of maps)
 //
 
+
+
+struct package_loaded_inner_map {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 10000);
+    __type(key, file_of_package_t);
+    __type(value, u8); // id of the package
+} package_loaded_inner_map SEC(".maps");
+
+typedef struct package_loaded_inner_map package_loaded_inner_map_t;
+
+struct package_loaded_outer_map {
+    __uint(type, BPF_MAP_TYPE_HASH_OF_MAPS);
+    __uint(max_entries, 500);
+    __type(key, u16);
+    __array(values, package_loaded_inner_map_t);
+} package_loaded_outer_map SEC(".maps");
+
+
+
+
+
 #define MAX_FILTER_VERSION 64 // max amount of filter versions to track
 struct policies_config_map {
     __uint(type, BPF_MAP_TYPE_HASH);

@@ -286,6 +286,10 @@ typedef struct path_filter {
     char path[MAX_PATH_PREF_SIZE];
 } path_filter_t;
 
+typedef struct file_of_package {
+    char path[128];
+} file_of_package_t;
+
 typedef struct data_filter_key {
     char str[MAX_DATA_FILTER_STR_SIZE];
 } data_filter_key_t;

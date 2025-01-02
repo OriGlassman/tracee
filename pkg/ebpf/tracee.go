@@ -1379,6 +1379,7 @@ func (t *Tracee) Run(ctx gocontext.Context) error {
 	}
 
 	go t.lkmSeekerRoutine(ctx)
+	go t.packageLoadedRoutine(ctx)
 
 	// Start control plane
 	t.controlPlane.Start()
