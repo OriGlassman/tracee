@@ -99,7 +99,7 @@ func createNewInnerMapEventId(m *bpf.Module, mapName string, mapVersion uint16, 
 }
 
 // createNewInnerMap creates a new map for the given map name and version.
-func createNewInnerMap(m *bpf.Module, mapName string, mapVersion uint16) (*bpf.BPFMapLow, error) {
+func CreateNewInnerMap(m *bpf.Module, mapName string, mapVersion uint16) (*bpf.BPFMapLow, error) {
 	// use the map prototype to create a new map with the same properties
 	prototypeMap, err := m.GetMap(mapName)
 	if err != nil {
@@ -167,7 +167,7 @@ func updateOuterMapWithEventId(m *bpf.Module, mapName string, mapVersion uint16,
 }
 
 // updateOuterMap updates the outer map with the given map name and version.
-func updateOuterMap(m *bpf.Module, mapName string, mapVersion uint16, innerMap *bpf.BPFMapLow) error {
+func UpdateOuterMap(m *bpf.Module, mapName string, mapVersion uint16, innerMap *bpf.BPFMapLow) error {
 	outerMap, err := m.GetMap(mapName)
 	if err != nil {
 		return errfmt.WrapError(err)
@@ -252,7 +252,7 @@ func (ps *policies) createNewFilterMapsVersion(bpfModule *bpf.Module) error {
 	for innerMapName, outerMapName := range mapsNames {
 		// TODO: This only spawns new inner filter maps. Their termination must
 		// be tackled by the versioning mechanism.
-		newInnerMap, err := createNewInnerMap(bpfModule, innerMapName, polsVersion)
+		newInnerMap, err := CreateNewInnerMap(bpfModule, innerMapName, polsVersion)
 		if err != nil {
 			return errfmt.WrapError(err)
 		}
@@ -267,7 +267,7 @@ func (ps *policies) createNewFilterMapsVersion(bpfModule *bpf.Module) error {
 		// 7. comm_filter_version          	u16, comm_filter
 		// 8. process_tree_filter_version	u16, process_tree_filter
 		// 9. binary_filter_version		    u16, binary_filter
-		if err := updateOuterMap(bpfModule, outerMapName, polsVersion, newInnerMap); err != nil {
+		if err := UpdateOuterMap(bpfModule, outerMapName, polsVersion, newInnerMap); err != nil {
 			return errfmt.WrapError(err)
 		}
 
@@ -297,12 +297,12 @@ func (ps *policies) createNewEventsMapVersion(
 
 	// TODO: This only spawns a new inner event map. Their termination must
 	// be tackled by the versioning mechanism.
-	newInnerMap, err := createNewInnerMap(bpfModule, innerMapName, polsVersion)
+	newInnerMap, err := CreateNewInnerMap(bpfModule, innerMapName, polsVersion)
 	if err != nil {
 		return errfmt.WrapError(err)
 	}
 
-	if err := updateOuterMap(bpfModule, outerMapName, polsVersion, newInnerMap); err != nil {
+	if err := UpdateOuterMap(bpfModule, outerMapName, polsVersion, newInnerMap); err != nil {
 		return errfmt.WrapError(err)
 	}
 
@@ -802,13 +802,13 @@ func (ps *policies) updateBPF(
 // createNewPoliciesConfigMap creates a new version of the policies config map
 func (ps *policies) createNewPoliciesConfigMap(bpfModule *bpf.Module) error {
 	version := ps.version()
-	newInnerMap, err := createNewInnerMap(bpfModule, PoliciesConfigMap, version)
+	newInnerMap, err := CreateNewInnerMap(bpfModule, PoliciesConfigMap, version)
 	if err != nil {
 		return errfmt.WrapError(err)
 	}
 
 	// policies_config_version  u16, policies_config_map
-	if err := updateOuterMap(bpfModule, PoliciesConfigVersion, version, newInnerMap); err != nil {
+	if err := UpdateOuterMap(bpfModule, PoliciesConfigVersion, version, newInnerMap); err != nil {
 		return errfmt.WrapError(err)
 	}
 

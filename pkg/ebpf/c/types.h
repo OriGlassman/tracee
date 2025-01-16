@@ -133,6 +133,7 @@ enum event_id_e
     SECURITY_TASK_SETRLIMIT,
     SECURITY_SETTIME64,
     CHMOD_COMMON,
+    PACKAGE_LOADED,
     MAX_EVENT_ID,
     NO_EVENT_SUBMIT,
 
@@ -236,6 +237,12 @@ typedef struct file_id {
     u64 ctime;
 } file_id_t;
 
+typedef struct package_entry {
+    char path[126];
+    // dev_t device;
+    // unsigned long inode;
+} package_entry_t;
+
 typedef struct file_info {
     union {
         char pathname[MAX_CACHED_PATH_SIZE];
@@ -306,6 +313,11 @@ typedef struct string_filter {
 typedef struct ksym_name {
     char str[MAX_KSYM_NAME_SIZE];
 } ksym_name_t;
+
+typedef struct package_loaded_outter_key {
+    u32 cgroup_id;
+    //char str[10];
+} package_loaded_outter_key_t;
 
 typedef struct policy_key {
     u16 version;

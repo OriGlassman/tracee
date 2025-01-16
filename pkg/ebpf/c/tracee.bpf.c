@@ -2214,7 +2214,7 @@ int BPF_KPROBE(trace_security_bprm_check)
 
 SEC("kprobe/security_file_open")
 int BPF_KPROBE(trace_security_file_open)
-{
+{   bpf_printk("aaaaaaaaaaa");
     program_data_t p = {};
     if (!init_program_data(&p, ctx, SECURITY_FILE_OPEN))
         return 0;
@@ -2258,6 +2258,55 @@ int BPF_KPROBE(trace_security_file_open)
 
     if (!evaluate_data_filters(&p, 0))
         return 0;
+
+    return events_perf_submit(&p, 0);
+}
+
+
+SEC("kprobe/security_file_open")
+int BPF_KPROBE(trace_package_loaded)
+{
+    program_data_t p = {};
+    if (!init_program_data(&p, ctx, PACKAGE_LOADED))
+        return 0;
+
+    if (!evaluate_scope_filters(&p))
+        return 0;
+    
+    u64 cgroup_id = p.event->context.task.cgroup_id;
+    if (bpf_map_lookup_elem(&containers_map, &cgroup_id) == NULL)
+        return 0;
+
+    struct file *file = (struct file *) PT_REGS_PARM1(ctx);
+    void *file_path = get_path_str(__builtin_preserve_access_index(&file->f_path));
+    package_entry_t package = {};
+
+    long size = bpf_probe_read_kernel_str(package.path, 126, file_path);
+
+    u32 cgroup_lsb = cgroup_id;
+    //bpf_printk("cgroup=%d, fpath=%s\n", cgroup_lsb, package.path);
+
+    void *inner_map = bpf_map_lookup_elem(&package_loaded_outer_map, &cgroup_lsb);
+    if (inner_map == NULL) {
+        // TODO: should not happen
+        return 0;
+    }
+    u32 s = 42;//size - 1;
+    u32 h;
+    if (s >= 0 && s <= 45) {
+        h = murmur32(package.path, s);
+    }
+
+   // bpf_printk("found in outer map. hash=%u len=%d, package:%s\n",h, size, package.path);
+    
+    void *package_name = bpf_map_lookup_elem(inner_map, &h);
+    if (package_name == NULL)
+        return 0;
+    
+    bpf_printk("triggering event");
+    
+    save_str_to_buf(&p.event->args_buf, file_path, 0);
+    save_str_to_buf(&p.event->args_buf, package_name, 1);
 
     return events_perf_submit(&p, 0);
 }

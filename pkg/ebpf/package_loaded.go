@@ -4,10 +4,20 @@ import (
 	"bufio"
 	gocontext "context"
 	"fmt"
+	bpf "github.com/aquasecurity/libbpfgo"
+	"github.com/aquasecurity/tracee/pkg/capabilities"
+	"github.com/aquasecurity/tracee/pkg/errfmt"
 	"github.com/aquasecurity/tracee/pkg/logger"
+	"github.com/aquasecurity/tracee/pkg/policy"
+	"github.com/aquasecurity/tracee/pkg/utils"
+	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/client"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
+	"unsafe"
 )
 
 func (t *Tracee) packageLoadedRoutine(ctx gocontext.Context) error {
@@ -31,6 +41,11 @@ func (t *Tracee) packageLoadedRoutine(ctx gocontext.Context) error {
 	}
 
 	return nil
+}
+
+type innerEntryKey struct {
+	devNum   uint64
+	inodeNum uint64
 }
 
 func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
@@ -69,7 +84,33 @@ func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
 				parts := strings.Fields(line)
 				if len(parts) == 2 {
 					filePath := "/" + parts[1]
-					fileToPackageMap[filePath] = packageName
+					packageFile := prefix + filePath
+					fileInfo, err := os.Stat(packageFile)
+					if err != nil {
+						fmt.Printf("Error getting file info: %v\n", err)
+						return err
+					}
+
+					// Get the syscall.Stat_t structure
+					stat, ok := fileInfo.Sys().(*syscall.Stat_t)
+					if !ok {
+						fmt.Println("Failed to get file system stat info")
+						return err
+					}
+
+					// Extract inode and device numbers
+					inode := stat.Ino
+					device := stat.Dev
+
+					key := innerEntryKey{
+						devNum:   device,
+						inodeNum: inode,
+					}
+
+					if _, found := fileToPackageMap[filePath]; found {
+						logger.Infow("already found", "key", filePath)
+					}
+					fileToPackageMap[key] = packageName
 				}
 			}
 
@@ -78,16 +119,117 @@ func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
 			}
 		}
 	}
-	maxSize := 0
-	for file, pkg := range fileToPackageMap {
-		if len(file) > maxSize {
-			maxSize = len(file)
-		}
-		fmt.Printf("%s -> %s\n", file, pkg)
+
+	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+	if err != nil {
+		return fmt.Errorf("failed to create Docker client: %w", err)
 	}
-	fmt.Printf("amount of entries=%d, max_path_size=%d\n", len(fileToPackageMap), maxSize)
+
+	containers, err := cli.ContainerList(ctx, container.ListOptions{All: true})
+	if err != nil {
+		log.Fatalf("Failed to list containers: %v", err)
+	}
+
+	for _, c := range containers {
+		// Inspect the container to get detailed information
+		containerJSON, err := cli.ContainerInspect(ctx, c.ID)
+		if err != nil {
+			return fmt.Errorf("failed to inspect container %s: %w", c.ID, err)
+		}
+
+		// Check if the container is using the overlay2 storage driver
+		graphDriver := containerJSON.GraphDriver
+		if graphDriver.Name != "overlay2" {
+			return fmt.Errorf("container %s is not using the overlay2 storage driver", c.ID)
+		}
+
+		// Get the overlay2 ID from GraphDriver.Data
+		overlayPath, ok := graphDriver.Data["UpperDir"]
+		if !ok {
+			return fmt.Errorf("overlay2 ID not found for container %s", c.ID)
+		}
+
+		overlayID := strings.Split(overlayPath, string(filepath.Separator))[5]
+
+		overlayFromFs := strings.Split(prefix, string(filepath.Separator))[5]
+		logger.Infow("overlayfs", "parse", overlayFromFs, "id", overlayID)
+
+		if overlayID != overlayFromFs {
+			continue
+		}
+
+		logger.Infow("filling package map")
+		return capabilities.GetInstance().Full(
+			func() error {
+				innerMap, err := policy.CreateNewInnerMap(t.bpfModule, "package_loaded_inner_map", 0)
+				if err != nil {
+					logger.Errorw("failed creating new inner map", "err", err)
+					return err
+				}
+
+				outerMap, err := t.bpfModule.GetMap("package_loaded_outer_map")
+				if err != nil {
+					return errfmt.WrapError(err)
+				}
+
+				cgroupIdsLSB, err := t.containers.FindContainerCgroupID32LSB(c.ID)
+				if err != nil {
+					return err
+				}
+
+				hashToPath, err := fillInnerMap(innerMap, fileToPackageMap)
+				if err != nil {
+					logger.Errorw("failed filling inner map", "err", err, "a", len(hashToPath))
+					return err
+				}
+
+				cgroupIdLsb := cgroupIdsLSB[0]
+				logger.Infow("inner map", "key", cgroupIdLsb)
+				keyPointer := unsafe.Pointer(&cgroupIdLsb)
+				innerMapFD := uint32(innerMap.FileDescriptor())
+				valuePointer := unsafe.Pointer(&innerMapFD)
+
+				if err := outerMap.Update(keyPointer, valuePointer); err != nil {
+					logger.Errorw("faile dupdating oute rmap")
+					return errfmt.WrapError(err)
+				}
+				return nil
+			},
+		)
+
+	}
+	//
+	//maxSize := 0
+	//for file, pkg := range fileToPackageMap {
+	//	if len(file) > maxSize {
+	//		maxSize = len(file)
+	//	}
+	//	fmt.Printf("%s -> %s\n", file, pkg)
+	//}
+	//fmt.Printf("amount of entries=%d, max_path_size=%d\n", len(fileToPackageMap), maxSize)
 
 	return nil
+}
+
+func fillInnerMap(innerMap *bpf.BPFMapLow, fileToPackageMap map[string]string) (map[uint32]string, error) {
+	hashToPathMap := map[uint32]string{}
+	for filePath, packageName := range fileToPackageMap {
+		bFilePath := []byte(filePath)
+		bPackageName := []byte(packageName)
+		hash := utils.Murmur32(bFilePath)
+		if filePath == "/usr/lib/x86_64-linux-gnu/perl-base/Errno.pm" || filePath == "/usr/lib/x86_64-linux-gnu/gconv/IBM1130.so" {
+			logger.Infow("", "hash", hash, "packagename", bPackageName, "len", len(bFilePath))
+		}
+
+		err := innerMap.Update(unsafe.Pointer(&hash), unsafe.Pointer(&bPackageName[0]))
+		if err != nil {
+			return nil, err
+		}
+
+		hashToPathMap[hash] = filePath
+	}
+
+	return hashToPathMap, nil
 }
 
 ////func init() {
