@@ -607,6 +607,12 @@ func (t *Tracee) initDerivationTable() error {
 				DeriveFunction: derive.DetectHookedSyscall(t.kernelSymbols),
 			},
 		},
+		events.PackageLoadedInternal: {
+			events.PackageLoaded: {
+				Enabled:        shouldSubmit(events.PackageLoaded),
+				DeriveFunction: derive.DetectPackageLoaded(t.kernelSymbols),
+			},
+		},
 		events.PrintNetSeqOps: {
 			events.HookedSeqOps: {
 				Enabled:        shouldSubmit(events.HookedSeqOps),

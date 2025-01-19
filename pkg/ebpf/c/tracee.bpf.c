@@ -2278,10 +2278,12 @@ int BPF_KPROBE(trace_package_loaded)
         return 0;
 
     struct file *file = (struct file *) PT_REGS_PARM1(ctx);
+    dev_t s_dev = get_dev_from_file(file);
+    unsigned long inode_nr = get_inode_nr_from_file(file);
     void *file_path = get_path_str(__builtin_preserve_access_index(&file->f_path));
-    package_entry_t package = {};
+    //package_entry_t package = {};
 
-    long size = bpf_probe_read_kernel_str(package.path, 126, file_path);
+    //long size = bpf_probe_read_kernel_str(package.path, 126, file_path);
 
     u32 cgroup_lsb = cgroup_id;
     //bpf_printk("cgroup=%d, fpath=%s\n", cgroup_lsb, package.path);
@@ -2291,15 +2293,17 @@ int BPF_KPROBE(trace_package_loaded)
         // TODO: should not happen
         return 0;
     }
-    u32 s = 42;//size - 1;
-    u32 h;
-    if (s >= 0 && s <= 45) {
-        h = murmur32(package.path, s);
-    }
+    // const u32 s = size - 1;
+    // u32 h;
+    // if (s >= 0 && s <= 126) {
+    //     h = murmur32(package.path, s); // verifier complains when size is size - 1 and that's whats needed
+    // }
 
-   // bpf_printk("found in outer map. hash=%u len=%d, package:%s\n",h, size, package.path);
+    bpf_printk("found in outer map.  inode=%u, dev=%ul\n",inode_nr, s_dev);
+
+    inner_package_key_t inner_key = {.dev_num=s_dev, .inode_num=inode_nr};
     
-    void *package_name = bpf_map_lookup_elem(inner_map, &h);
+    void *package_name = bpf_map_lookup_elem(inner_map, &inner_key); //TODO: how to make this work
     if (package_name == NULL)
         return 0;
     

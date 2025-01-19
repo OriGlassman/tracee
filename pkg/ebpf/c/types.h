@@ -238,9 +238,7 @@ typedef struct file_id {
 } file_id_t;
 
 typedef struct package_entry {
-    char path[126];
-    // dev_t device;
-    // unsigned long inode;
+    char path[25];
 } package_entry_t;
 
 typedef struct file_info {
@@ -369,6 +367,12 @@ typedef struct policies_config {
     u64 pid_max;
     u64 pid_min;
 } policies_config_t;
+
+
+typedef struct inner_package_key {
+    u64 dev_num;
+    u64 inode_num;
+} inner_package_key_t;
 
 typedef struct config_entry {
     u32 tracee_pid;

@@ -420,10 +420,12 @@ typedef struct elf_files_map elf_files_map_t;
 
 
 
+
+
 struct package_loaded_inner_map {
     __uint(type, BPF_MAP_TYPE_HASH);
     __uint(max_entries, 50000);
-    __type(key, u32);
+    __type(key, inner_package_key_t);
     __type(value, package_entry_t); // id of the package
 } package_loaded_inner_map SEC(".maps");
 
@@ -431,7 +433,7 @@ typedef struct package_loaded_inner_map package_loaded_inner_map_t;
 
 struct package_loaded_outer_map {
     __uint(type, BPF_MAP_TYPE_HASH_OF_MAPS);
-    __uint(max_entries, 50);
+    __uint(max_entries, 400);
     __type(key, package_loaded_outter_key_t);
     __array(values, package_loaded_inner_map_t);
 } package_loaded_outer_map SEC(".maps");

@@ -115,6 +115,7 @@ const (
 	SecurityTaskSetrlimit
 	SecuritySettime64
 	ChmodCommon
+	PackageLoadedInternal
 	PackageLoaded
 	MaxCommonID
 )
@@ -13077,6 +13078,22 @@ var CoreEvents = map[ID]Definition{
 			{Type: "unsigned long", Name: "vma_flags"},
 		},
 	},
+	PackageLoadedInternal: {
+		id:       PackageLoadedInternal,
+		id32Bit:  Sys32Undefined,
+		name:     "package_loaded_internal",
+		sets:     []string{},
+		internal: true,
+		fields: []trace.ArgMeta{
+			{Type: "char*", Name: "pathname"},
+			{Type: "char*", Name: "package_name"},
+		},
+		dependencies: Dependencies{
+			probes: []Probe{
+				{handle: probes.PackageLoaded, required: true},
+			},
+		},
+	},
 	PackageLoaded: {
 		id:      PackageLoaded,
 		id32Bit: Sys32Undefined,
@@ -13087,8 +13104,8 @@ var CoreEvents = map[ID]Definition{
 			{Type: "char*", Name: "package_name"},
 		},
 		dependencies: Dependencies{
-			probes: []Probe{
-				{handle: probes.PackageLoaded, required: true},
+			ids: []ID{
+				PackageLoadedInternal,
 			},
 		},
 	},

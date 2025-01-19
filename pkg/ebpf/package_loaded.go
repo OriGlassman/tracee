@@ -9,7 +9,6 @@ import (
 	"github.com/aquasecurity/tracee/pkg/errfmt"
 	"github.com/aquasecurity/tracee/pkg/logger"
 	"github.com/aquasecurity/tracee/pkg/policy"
-	"github.com/aquasecurity/tracee/pkg/utils"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
 	"log"
@@ -36,8 +35,6 @@ func (t *Tracee) packageLoadedRoutine(ctx gocontext.Context) error {
 		if err != nil {
 			return err
 		}
-		logger.Infow("TODO: breaking after one container")
-		break
 	}
 
 	return nil
@@ -52,12 +49,12 @@ func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
 	dpkgInfoDir := "/var/lib/dpkg/info"
 
 	// Map to store file paths and their corresponding package names
-	fileToPackageMap := make(map[string]string)
+	fileToPackageMap := make(map[innerEntryKey]string)
 
 	dirEntries, err := os.ReadDir(prefix + dpkgInfoDir)
 	if err != nil {
 		fmt.Printf("Failed to read dpkg info directory: %v\n", err)
-		return err
+		return
 	}
 
 	for _, entry := range dirEntries {
@@ -87,15 +84,15 @@ func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
 					packageFile := prefix + filePath
 					fileInfo, err := os.Stat(packageFile)
 					if err != nil {
-						fmt.Printf("Error getting file info: %v\n", err)
-						return err
+						logger.Debugw("Error getting file info: %v\n", err)
+						continue
 					}
 
 					// Get the syscall.Stat_t structure
 					stat, ok := fileInfo.Sys().(*syscall.Stat_t)
 					if !ok {
-						fmt.Println("Failed to get file system stat info")
-						return err
+						logger.Errorw("Failed to get file system stat info")
+						return
 					}
 
 					// Extract inode and device numbers
@@ -107,10 +104,8 @@ func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
 						inodeNum: inode,
 					}
 
-					if _, found := fileToPackageMap[filePath]; found {
-						logger.Infow("already found", "key", filePath)
-					}
 					fileToPackageMap[key] = packageName
+					//logger.Infow("", "path", packageFile, "packagename", packageName)
 				}
 			}
 
@@ -122,7 +117,8 @@ func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
 
 	cli, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
 	if err != nil {
-		return fmt.Errorf("failed to create Docker client: %w", err)
+		fmt.Printf("failed to create Docker client: %w", err)
+		return nil
 	}
 
 	containers, err := cli.ContainerList(ctx, container.ListOptions{All: true})
@@ -130,23 +126,26 @@ func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
 		log.Fatalf("Failed to list containers: %v", err)
 	}
 
-	for _, c := range containers {
+	for i, c := range containers {
 		// Inspect the container to get detailed information
 		containerJSON, err := cli.ContainerInspect(ctx, c.ID)
 		if err != nil {
-			return fmt.Errorf("failed to inspect container %s: %w", c.ID, err)
+			fmt.Printf("failed to inspect container %s: %w", c.ID, err)
+			return nil
 		}
 
 		// Check if the container is using the overlay2 storage driver
 		graphDriver := containerJSON.GraphDriver
 		if graphDriver.Name != "overlay2" {
-			return fmt.Errorf("container %s is not using the overlay2 storage driver", c.ID)
+			fmt.Printf("container %s is not using the overlay2 storage driver", c.ID)
+			return nil
 		}
 
 		// Get the overlay2 ID from GraphDriver.Data
 		overlayPath, ok := graphDriver.Data["UpperDir"]
 		if !ok {
-			return fmt.Errorf("overlay2 ID not found for container %s", c.ID)
+			fmt.Printf("overlay2 ID not found for container %s", c.ID)
+			return nil
 		}
 
 		overlayID := strings.Split(overlayPath, string(filepath.Separator))[5]
@@ -161,7 +160,7 @@ func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
 		logger.Infow("filling package map")
 		return capabilities.GetInstance().Full(
 			func() error {
-				innerMap, err := policy.CreateNewInnerMap(t.bpfModule, "package_loaded_inner_map", 0)
+				innerMap, err := policy.CreateNewInnerMap(t.bpfModule, "package_loaded_inner_map", uint16(i))
 				if err != nil {
 					logger.Errorw("failed creating new inner map", "err", err)
 					return err
@@ -177,9 +176,9 @@ func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
 					return err
 				}
 
-				hashToPath, err := fillInnerMap(innerMap, fileToPackageMap)
+				err = fillInnerMap(innerMap, fileToPackageMap)
 				if err != nil {
-					logger.Errorw("failed filling inner map", "err", err, "a", len(hashToPath))
+					logger.Errorw("failed filling inner map", "err", err)
 					return err
 				}
 
@@ -196,7 +195,6 @@ func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
 				return nil
 			},
 		)
-
 	}
 	//
 	//maxSize := 0
@@ -211,25 +209,23 @@ func (t *Tracee) scanContainer(ctx gocontext.Context, prefix string) error {
 	return nil
 }
 
-func fillInnerMap(innerMap *bpf.BPFMapLow, fileToPackageMap map[string]string) (map[uint32]string, error) {
-	hashToPathMap := map[uint32]string{}
-	for filePath, packageName := range fileToPackageMap {
-		bFilePath := []byte(filePath)
+func fillInnerMap(innerMap *bpf.BPFMapLow, fileToPackageMap map[innerEntryKey]string) error {
+	//hashToPathMap := map[uint32]string{}
+	for key, packageName := range fileToPackageMap {
+		//bFilePath := []byte(filePath)
 		bPackageName := []byte(packageName)
-		hash := utils.Murmur32(bFilePath)
-		if filePath == "/usr/lib/x86_64-linux-gnu/perl-base/Errno.pm" || filePath == "/usr/lib/x86_64-linux-gnu/gconv/IBM1130.so" {
-			logger.Infow("", "hash", hash, "packagename", bPackageName, "len", len(bFilePath))
-		}
+		bPackageName = append(bPackageName, 0)
+		//hash := utils.Murmur32(bFilePath)
 
-		err := innerMap.Update(unsafe.Pointer(&hash), unsafe.Pointer(&bPackageName[0]))
+		err := innerMap.Update(unsafe.Pointer(&key), unsafe.Pointer(&bPackageName[0]))
 		if err != nil {
-			return nil, err
+			return err
 		}
 
-		hashToPathMap[hash] = filePath
+		//hashToPathMap[hash] = filePath
 	}
 
-	return hashToPathMap, nil
+	return nil
 }
 
 ////func init() {
