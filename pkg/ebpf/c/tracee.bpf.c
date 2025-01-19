@@ -2263,6 +2263,20 @@ int BPF_KPROBE(trace_security_file_open)
     void *file_path = get_path_str(__builtin_preserve_access_index(&file->f_path));
     u64 ctime = get_ctime_nanosec_from_file(file);
 
+    u64 dev = s_dev;
+    e_t e = {.device=dev, inode_nr=inode_nr};
+
+    u64 before = bpf_ktime_get_ns();
+    void *val = bpf_map_lookup_elem(&big_map, &e);
+    u64 after = bpf_ktime_get_ns();
+    u64 d = after - before;
+    if (val == NULL) {
+        bpf_printk("map miss: time passed: %llu", d);
+        return 0;
+    }
+
+    bpf_printk("map HIT: time passed: %llu", d);
+    
     // Load the arguments given to the open syscall (which eventually invokes this function)
     char empty_string[1] = "";
     void *syscall_pathname = &empty_string;

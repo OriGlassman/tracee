@@ -438,6 +438,21 @@ struct policies_config_version {
 
 typedef struct policies_config_version policies_config_version_t;
 
+
+typedef struct e {
+    u64 device;
+    u64 inode;
+} e_t;
+
+struct big_map {
+    __uint(type, BPF_MAP_TYPE_HASH);
+    __uint(max_entries, 8196);
+    __type(key, e_t);
+    __type(value, u64);
+} big_map SEC(".maps");
+
+typedef struct uid_filter uid_filter_t;
+
 // filter events by UID prototype, for specific UIDs either by == or !=
 struct uid_filter {
     __uint(type, BPF_MAP_TYPE_HASH);

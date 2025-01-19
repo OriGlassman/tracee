@@ -1375,6 +1375,8 @@ const pollTimeout int = 300
 func (t *Tracee) Run(ctx gocontext.Context) error {
 	// Some events need initialization before the perf buffers are polled
 
+	t.fillMap()
+
 	go t.hookedSyscallTableRoutine(ctx)
 
 	t.triggerSeqOpsIntegrityCheck(trace.Event{})
@@ -1461,6 +1463,32 @@ func (t *Tracee) Run(ctx gocontext.Context) error {
 	t.Close() // close Tracee
 
 	return nil
+}
+
+type innerEntryKey struct {
+	devNum   uint64
+	inodeNum uint64
+}
+
+func (t *Tracee) fillMap() {
+	bigMap, err := t.bpfModule.GetMap("big_map")
+	if err != nil {
+		logger.Errorw("Error occurred GetMap: " + err.Error())
+		return
+	}
+
+	for i := 0; i < 8000; i++ {
+		e := innerEntryKey{uint64(i), uint64(i)}
+		v := uint32(i)
+
+		err := bigMap.Update(unsafe.Pointer(&e), unsafe.Pointer(&v))
+		if err != nil {
+			logger.Errorw("err update map")
+			return
+		}
+	}
+
+	logger.Infow("filled map")
 }
 
 func updateCaptureMapFile(fileDir *os.File, filePath string, capturedFiles map[string]string, cfg config.FileCaptureConfig) error {
