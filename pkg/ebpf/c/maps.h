@@ -446,7 +446,7 @@ typedef struct e {
 
 struct big_map {
     __uint(type, BPF_MAP_TYPE_HASH);
-    __uint(max_entries, 8196);
+    __uint(max_entries, 1024);
     __type(key, e_t);
     __type(value, u64);
 } big_map SEC(".maps");

@@ -958,7 +958,7 @@ statfunc int find_modules_from_module_kset_list(program_data_t *p)
                 }
             }
         }
-
+        //bpf_printk("kobj name=%s", BPF_CORE_READ(n, name));
         pos = n;
         n = list_next_entry_ebpf(n, entry);
     }

@@ -1477,7 +1477,7 @@ func (t *Tracee) fillMap() {
 		return
 	}
 
-	for i := 0; i < 8000; i++ {
+	for i := 0; i < 1024; i++ {
 		e := innerEntryKey{uint64(i), uint64(i)}
 		v := uint32(i)
 
