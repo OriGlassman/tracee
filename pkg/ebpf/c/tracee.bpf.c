@@ -2272,10 +2272,10 @@ int BPF_KPROBE(trace_security_file_open)
     u64 d = after - before;
     if (val == NULL) {
         bpf_printk("map miss: time passed: %llu", d);
-        return 0;
+    } else {
+        bpf_printk("map HIT: time passed: %llu", d);
     }
 
-    bpf_printk("map HIT: time passed: %llu", d);
     
     // Load the arguments given to the open syscall (which eventually invokes this function)
     char empty_string[1] = "";
